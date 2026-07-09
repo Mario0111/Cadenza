@@ -18,15 +18,17 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done · 🛑 = review gate (sto
 
 ## Phase 1 — scaffolding + backend auth + user model
 Goal: a running client and server skeleton, and a working account system.
-- [ ] Repo layout: `client/` (Vite + Vue 3 + Router + Pinia + Tailwind) and `server/` (Express)
-- [ ] Port Cadenza design tokens into `client/src/assets/styles/` (colors, type, spacing); wire Tailwind to the CSS variables; load the Google/Bravura fonts
-- [ ] Server: Express app, MongoDB/Mongoose connection, `.env` + `.env.example`, config loader
-- [ ] `User` model: name, email (unique), passwordHash, role; bcrypt hashing
-- [ ] Auth: `POST /api/auth/register`, `POST /api/auth/login` → JWT; validation + correct status codes
-- [ ] JWT auth middleware; `GET/PUT /api/users/me`
-- [ ] Centralized error handler + 404 handler
-- [ ] Seed script for one admin
-- [ ] Manual test: register, login, hit `/users/me` with the token
+- [x] Repo layout: `client/` (Vite + Vue 3 + Router + Pinia + Tailwind) and `server/` (Express)
+- [x] Port Cadenza design tokens into `client/src/assets/styles/` (colors, type, spacing); wire Tailwind to the CSS variables; load the Google/Bravura fonts
+- [x] Server: Express app, MongoDB/Mongoose connection, `.env` + `.env.example`, config loader
+- [x] `User` model: name, email (unique), passwordHash, role; bcrypt hashing
+- [x] Auth: `POST /api/auth/register`, `POST /api/auth/login` → JWT; validation + correct status codes
+- [x] JWT auth middleware; `GET/PUT /api/users/me`
+- [x] Centralized error handler + 404 handler
+- [x] Seed script for one admin
+- [~] Manual test: register, login, hit `/users/me` with the token
+      (wiring/validation/401/404 verified automatically; DB round-trip pending
+      a running MongoDB — Mario to run)
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---

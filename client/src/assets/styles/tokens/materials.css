@@ -1,0 +1,113 @@
+/* Cadenza — Materials & texture tokens
+   How paper, aging, engraved line and ornament are built. Shadows are warm and
+   soft (paper lifting off a desk), never neutral-grey UI shadows. Textures are
+   whispers — foxing and warm edges, never grunge.
+*/
+
+:root {
+  /* ============================================================
+     REAL ENGRAVED-PAPER TEXTURES (raster)
+     Drop AI-generated scans into  ../assets/textures/  and these
+     light up automatically. Each is layered ON TOP of the CSS
+     gradient fallbacks below, so a missing file degrades to the
+     old drawn look instead of breaking. Paths resolve relative to
+     THIS file (tokens/), i.e. ../assets/textures/*.
+     See  assets/textures/PROMPTS.md  for how to generate them.
+     ------------------------------------------------------------
+     Overlays are meant to sit in a  mix-blend-mode: multiply  layer
+     on aged paper, so they are supplied on a light paper ground
+     (no transparency needed — white multiplies to nothing).
+     Paths are ROOT-RELATIVE (/assets/...) because these tokens are
+     substituted into inline styles, which resolve URLs against the
+     HTML document, not this stylesheet. The design system is served
+     from its own root. If you mount it under a sub-path, prefix these
+     four values with that path.                                    */
+  --tex-paper:    url("/assets/textures/paper-cream-tile.jpg");   /* seamless base grain   */
+  --tex-foxing:   url("/assets/textures/foxing-overlay.jpg");     /* sparse aging overlay  */
+  --tex-distress: url("/assets/textures/distress-plate.jpg");     /* heavy worn plate      */
+  --tex-wood:     url("/assets/textures/walnut-grain-tile.jpg");  /* seamless walnut grain */
+
+  /* ---- Shadows (warm walnut-toned, soft) ---- */
+  --shadow-hair:  0 1px 0 rgba(30,26,19,0.04);
+  --shadow-sm:    0 1px 2px rgba(36,24,17,0.10), 0 1px 1px rgba(36,24,17,0.06);
+  --shadow-paper: 0 1px 2px rgba(36,24,17,0.10),
+                  0 6px 16px rgba(36,24,17,0.10);          /* lifted sheet */
+  --shadow-lift:  0 2px 4px rgba(36,24,17,0.10),
+                  0 14px 34px rgba(36,24,17,0.16);         /* floating card */
+  --shadow-panel: 0 0 0 1px rgba(30,26,19,0.05),
+                  -18px 0 40px -24px rgba(36,24,17,0.28);  /* attached panel */
+  --shadow-inset: inset 0 1px 2px rgba(36,24,17,0.12);     /* sunken well */
+  --shadow-focus: 0 0 0 3px rgba(176,141,60,0.34);         /* brass focus */
+
+  /* ---- Ink outlines (engraved edge) ---- */
+  --edge-ink:    0 0 0 1px rgba(30,26,19,0.16);
+  --edge-brass:  0 0 0 1px rgba(154,123,46,0.45);
+
+  /* ---- Paper texture (foxing / grain) — richer aging & speckle ---- */
+  /* Warm foxing spots + fibre flecks. Layer over surfaces with an ::after. */
+  --texture-foxing:
+    radial-gradient(circle at 20% 30%, rgba(120,88,52,0.11) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 68% 62%, rgba(120,88,52,0.09) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 82% 22%, rgba(110,52,40,0.08) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 40% 80%, rgba(120,88,52,0.09) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 12% 70%, rgba(110,52,40,0.06) 0 1px, transparent 2px),
+    radial-gradient(circle at 90% 84%, rgba(120,88,52,0.07) 0 1px, transparent 2px),
+    radial-gradient(circle at 55% 12%, rgba(120,88,52,0.05) 0 1px, transparent 2px);
+  --texture-foxing-size: 170px 170px, 210px 210px, 250px 250px, 190px 190px, 130px 130px, 150px 150px, 110px 110px;
+
+  /* ---- Warm paper edge vignette (aging concentrated at edges) ---- */
+  --edge-vignette:
+    radial-gradient(120% 108% at 50% 0%, transparent 52%, rgba(110,80,48,0.18) 100%);
+
+  /* ---- Wood grain (for walnut chrome) — fine aged streaks ---- */
+  --texture-wood:
+    repeating-linear-gradient(92deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(92deg, rgba(120,86,48,0.10) 0 2px, transparent 2px 11px),
+    linear-gradient(180deg, rgba(99,72,41,0.14), rgba(0,0,0,0.10));
+
+  /* ---- Broken / destroyed paper — heavy foxing + ink cracks + fibre streaks.
+     Reads as an unfinished, worn plate. Layer at high opacity with multiply. ---- */
+  /* NOTE: the two diagonal repeating-linear-gradients were removed — they
+     produced a regular criss-cross "mesh" of rhombi that read as synthetic,
+     not as aged paper. Aging is now irregular foxing + soft blotches only;
+     drop  distress-plate.jpg  in to replace this entirely with a real scan. */
+  --texture-broken:
+    radial-gradient(circle at 18% 26%, rgba(96,66,38,0.20) 0 1.6px, transparent 2.6px),
+    radial-gradient(circle at 71% 63%, rgba(96,66,38,0.16) 0 1.4px, transparent 2.4px),
+    radial-gradient(circle at 84% 20%, rgba(110,52,40,0.16) 0 1.3px, transparent 2.2px),
+    radial-gradient(circle at 38% 82%, rgba(96,66,38,0.15) 0 1.4px, transparent 2.4px),
+    radial-gradient(circle at 9% 72%, rgba(110,52,40,0.12) 0 1.1px, transparent 2px),
+    radial-gradient(circle at 93% 86%, rgba(96,66,38,0.13) 0 1.1px, transparent 2px),
+    radial-gradient(ellipse 60% 40% at 60% 30%, rgba(120,86,48,0.10), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 22% 78%, rgba(110,80,48,0.09), transparent 72%);
+  --texture-broken-size:
+    120px 120px, 150px 150px, 95px 95px, 170px 170px, 110px 110px, 130px 130px, cover, cover;
+
+  /* ---- Staff-line texture (five faint horizontal rules) ---- */
+  --staff-lines: repeating-linear-gradient(
+      to bottom,
+      transparent 0 11px,
+      var(--line-200) 11px 12px);
+
+  /* ---- Hairline rule as an image (for decorative dividers) ---- */
+  --rule-double:
+    linear-gradient(var(--line-300), var(--line-300)) top/100% 1px no-repeat,
+    linear-gradient(var(--line-300), var(--line-300)) bottom/100% 1px no-repeat;
+}
+
+/* Utility: a tactile paper surface. Compose on any block.
+   Gives a subtle foxing speckle + warm edge without hurting readability. */
+.cadenza-paper {
+  position: relative;
+  background-color: var(--surface-card);
+}
+.cadenza-paper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--texture-foxing), var(--edge-vignette);
+  background-size: var(--texture-foxing-size), cover;
+  opacity: 0.9;
+  mix-blend-mode: multiply;
+}

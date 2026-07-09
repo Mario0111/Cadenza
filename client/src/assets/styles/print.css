@@ -1,0 +1,17 @@
+/*
+ * Print styles — used by the Print/PDF flow in a later phase. Kept here now so
+ * the styles folder matches the planned structure. When printing we want the
+ * score on clean white paper, chrome hidden.
+ */
+@media print {
+  html,
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  /* Anything marked no-print (top chrome, tool rails, buttons) is hidden. */
+  .no-print {
+    display: none !important;
+  }
+}

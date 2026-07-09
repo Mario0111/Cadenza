@@ -1,0 +1,106 @@
+/* Cadenza — Base element defaults & small utilities.
+   Kept minimal: sets the paper ground, editorial defaults, link colours, and a
+   few composable helpers. Components own their own styling via tokens.
+*/
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background-color: var(--surface-page);
+  /* Real seamless paper grain when present; falls back to the flat aged-ivory
+     colour above if the tile is missing. Multiplied so the warm ground shows. */
+  background-image: var(--tex-paper);
+  background-size: 512px 512px;
+  background-blend-mode: multiply;
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display titles */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  line-height: var(--leading-tight);
+  color: var(--text-primary);
+  margin: 0 0 0.4em;
+  letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
+}
+h1 { font-size: var(--text-2xl); font-weight: var(--fw-medium); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+h4 { font-size: var(--text-md); font-family: var(--font-sans); font-weight: var(--fw-semibold); }
+
+p { margin: 0 0 1em; text-wrap: pretty; }
+
+/* Links — brass, understated; underline offset like an engraver's rule */
+a {
+  color: var(--accent-oxblood);
+  text-decoration-color: var(--brass-500);
+  text-underline-offset: 3px;
+  transition: var(--t-control);
+}
+a:hover { color: var(--oxblood-700); text-decoration-color: var(--oxblood-600); }
+
+/* Small-caps eyebrow label */
+.cadenza-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--eyebrow-size);
+  font-weight: var(--eyebrow-weight);
+  letter-spacing: var(--eyebrow-track);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Calligraphic flourish title */
+.cadenza-script {
+  font-family: var(--font-script);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+/* Engraved double-rule divider */
+.cadenza-rule {
+  height: 4px;
+  border: 0;
+  background: var(--rule-double);
+  margin: var(--space-7) 0;
+}
+
+/* Music-notation glyph helper */
+.cadenza-glyph { font-family: var(--font-music); font-weight: normal; line-height: 1; }
+
+/* Worn ink — flecks of paper eaten out of the letterforms, as if the plate has
+   aged. Clip a speckle of paper-colour over an ink base to the text itself.
+   Apply to titles/labels for a distressed, foxed look. Set --worn-ink to change
+   the base colour (defaults to primary ink). */
+.cadenza-worn {
+  --worn-ink: var(--ink-900);
+  color: transparent;
+  background-image:
+    radial-gradient(circle at 22% 32%, var(--paper-cream) 0 1.1px, transparent 1.6px),
+    radial-gradient(circle at 63% 58%, var(--paper-cream) 0 0.9px, transparent 1.4px),
+    radial-gradient(circle at 82% 24%, var(--paper-shade) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 40% 78%, var(--paper-cream) 0 0.8px, transparent 1.3px),
+    radial-gradient(circle at 12% 66%, var(--paper-shade) 0 0.9px, transparent 1.4px),
+    radial-gradient(circle at 91% 80%, var(--paper-cream) 0 0.8px, transparent 1.3px),
+    linear-gradient(var(--worn-ink), var(--worn-ink));
+  background-size: 37px 37px, 44px 44px, 29px 29px, 51px 51px, 33px 33px, 40px 40px, 100% 100%;
+  background-repeat: repeat, repeat, repeat, repeat, repeat, repeat, no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}

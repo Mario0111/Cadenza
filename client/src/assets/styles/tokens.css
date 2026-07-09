@@ -1,0 +1,23 @@
+/*
+ * Cadenza design tokens — the desk of an 18th–19th-century music engraver.
+ *
+ * These files are ported VERBATIM from the Cadenza-DS package (tokens/*.css),
+ * the single source of truth for colour, type, spacing, motion and materials.
+ * Components reference the semantic variables here — or Tailwind's classes that
+ * map to them (see tailwind.config.js) — never raw hex.
+ *
+ * fonts.css is imported first: it carries the Google Fonts @import, which the
+ * CSS spec requires to appear before any other rule.
+ *
+ * Note: base.css and materials.css reference optional raster textures under
+ * /assets/textures/*. Those files are intentionally absent — the design
+ * degrades gracefully to the flat aged-ivory ground and drawn gradients, so a
+ * few 404s for those tiles in dev are expected and harmless.
+ */
+@import './tokens/fonts.css';
+@import './tokens/colors.css';
+@import './tokens/spacing.css';
+@import './tokens/typography.css';
+@import './tokens/motion.css';
+@import './tokens/materials.css';
+@import './tokens/base.css';

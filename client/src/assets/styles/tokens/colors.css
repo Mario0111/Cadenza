@@ -1,0 +1,106 @@
+/* Cadenza — Colour tokens
+   A palette derived from the engraving references: near-white ivory paper as the
+   ground, fine warm engraving-black ink, sepia for aging, walnut for dark chrome,
+   and two restrained accents — muted brass and deep oxblood. No saturated colour.
+*/
+
+:root {
+  /* ---- Base: papers (the ground) — aged, ragged, warm ---- */
+  --paper-white:  #F3EAD5;  /* lifted / raised paper (cards, sheets)      */
+  --paper-ivory:  #E9DDC3;  /* primary page surface — aged ivory         */
+  --paper-cream:  #DBCCAA;  /* secondary / recessed surface              */
+  --paper-sepia:  #C6AE81;  /* warm aged paper — hero use, sparingly     */
+  --paper-shade:  #D0BE98;  /* sunken wells, input fills                 */
+
+  /* ---- Base: ink (warm near-blacks & greys) ---- */
+  --ink-900: #211A10;  /* engraving black — primary text, notation        */
+  --ink-800: #2F2717;
+  --ink-700: #423826;  /* strong secondary text                          */
+  --ink-500: #6B5F49;  /* muted text, captions                           */
+  --ink-400: #897B5F;  /* faint text                                     */
+  --ink-300: #A5967A;  /* placeholder, disabled ink                      */
+
+  /* ---- Base: hairlines & rules ---- */
+  --line-300: #B7A67C;  /* stronger rule / staff line                    */
+  --line-200: #C7B790;  /* standard hairline on paper                    */
+  --line-100: #D5C8A4;  /* faintest divider                              */
+
+  /* ---- Base: walnut (dark aged wood chrome — clean but old) ---- */
+  --walnut-900: #1A1009;  /* darkest — deep wood                         */
+  --walnut-800: #281A0F;
+  --walnut-700: #3A2716;  /* wood chrome surface                         */
+  --walnut-500: #634829;  /* wood highlight / edge                       */
+
+  /* ---- Accent: brass / muted gold ---- */
+  --brass-700: #7E6222;
+  --brass-600: #9A7B2E;  /* primary brass accent                         */
+  --brass-500: #B08D3C;  /* muted gold                                   */
+  --brass-300: #CBB06B;  /* faded gold highlight / on-wood text          */
+  --brass-100: #E9DCB8;  /* brass tint fill                              */
+
+  /* ---- Accent: oxblood / burgundy ---- */
+  --oxblood-800: #4C1D1B;
+  --oxblood-700: #5E2321;  /* deep oxblood                               */
+  --oxblood-600: #7A2E2B;  /* oxblood accent                             */
+  --oxblood-400: #9D4A45;  /* softer oxblood — the "quiet mark"          */
+  --oxblood-100: #E7D2CB;  /* oxblood tint fill                          */
+
+  /* ---- Accent: sepia (aging, warmth) ---- */
+  --sepia-600: #8A6B47;
+  --sepia-400: #B0906A;
+
+  /* ---- Muted sage (rare positive/confirm) ---- */
+  --sage-600: #5C6440;
+  --sage-100: #DDE0CB;
+
+  /* =========================================================
+     Semantic aliases — reference THESE in components.
+     ========================================================= */
+
+  /* Surfaces */
+  --surface-page:    var(--paper-ivory);
+  --surface-card:    var(--paper-white);
+  --surface-recess:  var(--paper-cream);
+  --surface-sunken:  var(--paper-shade);
+  --surface-hero:    var(--paper-sepia);
+  --surface-wood:    var(--walnut-800);
+  --surface-wood-2:  var(--walnut-700);
+
+  /* Text */
+  --text-primary:    var(--ink-900);
+  --text-secondary:  var(--ink-700);
+  --text-muted:      var(--ink-500);
+  --text-faint:      var(--ink-400);
+  --text-placeholder:var(--ink-300);
+  --text-on-wood:    var(--brass-300);
+  --text-on-wood-2:  #D9CDB4;
+  --text-inverse:    var(--paper-white);
+
+  /* Borders / rules */
+  --border-hairline: var(--line-200);
+  --border-strong:   var(--line-300);
+  --border-ink:      rgba(30, 26, 19, 0.55);
+  --rule-staff:      var(--line-300);
+
+  /* Accents */
+  --accent-brass:    var(--brass-600);
+  --accent-brass-hi: var(--brass-500);
+  --accent-oxblood:  var(--oxblood-600);
+
+  /* Focus */
+  --focus-ring:      var(--brass-500);
+
+  /* States — errors are QUIET (oxblood, never harsh red).
+     Never communicate an error by colour alone; pair with an icon/mark + text. */
+  --state-mark:      var(--oxblood-400);  /* the "quiet mark"               */
+  --state-mark-line: var(--oxblood-600);  /* underline / rule for the mark  */
+  --state-mark-fill: var(--oxblood-100);
+  --state-ok:        var(--sage-600);
+  --state-ok-fill:   var(--sage-100);
+
+  /* Selection */
+  --selection-bg:    var(--brass-100);
+  --selection-fg:    var(--ink-900);
+}
+
+::selection { background: var(--selection-bg); color: var(--selection-fg); }

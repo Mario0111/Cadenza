@@ -1,0 +1,58 @@
+/* Cadenza — Spacing & layout tokens
+   A calm, generous scale. The interface should breathe; negative space is a
+   material. Base unit 4px, but exact editorial values are kept where they read
+   better than a rigid grid.
+*/
+
+:root {
+  /* ---- Space scale ---- */
+  --space-0:  0;
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  8px;
+  --space-4:  12px;
+  --space-5:  16px;
+  --space-6:  20px;
+  --space-7:  24px;
+  --space-8:  32px;
+  --space-9:  40px;
+  --space-10: 56px;
+  --space-11: 72px;
+  --space-12: 96px;
+  --space-13: 128px;
+
+  /* ---- Semantic spacing ---- */
+  --gap-inline:   var(--space-3);  /* between inline controls          */
+  --gap-stack:    var(--space-5);  /* between stacked blocks           */
+  --pad-control:  var(--space-4);  /* inside buttons/inputs            */
+  --pad-card:     var(--space-8);  /* inside paper cards               */
+  --pad-section:  var(--space-12); /* page section rhythm              */
+  --margin-page:  var(--space-11); /* page gutters                     */
+
+  /* ---- Layout ---- */
+  --measure:        66ch;
+  --content-max:    1200px; /* marketing content width                */
+  --editor-rail:    64px;   /* score-editor tool rail width           */
+  --editor-panel:   320px;  /* note-properties panel width            */
+  --topbar-h:       56px;   /* top chrome height                      */
+
+  /* ---- Radii (engraved paper is nearly square) ---- */
+  --radius-xs:   2px;
+  --radius-sm:   3px;   /* default control radius                    */
+  --radius-md:   5px;   /* cards / sheets                            */
+  --radius-lg:   8px;
+  --radius-pill: 999px; /* tags / avatars                           */
+
+  /* ---- Border widths ---- */
+  --border-hair: 1px;
+  --border-med:  1.5px;
+  --border-rule: 2px;   /* engraved double-rule accents              */
+
+  /* ---- Z layers ---- */
+  --z-base:    0;
+  --z-raised:  10;
+  --z-panel:   100;
+  --z-chrome:  200;
+  --z-overlay: 900;
+  --z-modal:   1000;
+}

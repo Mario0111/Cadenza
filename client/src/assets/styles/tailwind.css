@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The Cadenza design system owns base element styling (paper ground, editorial
+   headings, links, focus ring) in tokens/base.css, which is imported after this
+   file in main.js so it wins over Tailwind's preflight where they overlap.
+   Utilities still override element styles when applied, thanks to specificity. */

@@ -1,0 +1,54 @@
+/* Cadenza — Typography tokens
+   Editorial hierarchy: ornate display serif for titles, calligraphic script for
+   rare flourishes, classic serif for reading + score text, restrained sans for
+   interface controls. Sizes are editorial (not oversized modern hero type).
+*/
+
+:root {
+  /* ---- Families ---- */
+  --font-display: 'Cormorant Garamond', 'Cormorant', Georgia, serif;   /* titles */
+  --font-blackletter: 'Grenze Gotisch', 'UnifrakturCook', 'Cormorant Garamond', serif; /* antique plate titles */
+  --font-script:  'Pinyon Script', 'Cormorant Garamond', cursive;      /* flourish */
+  --font-serif:   'EB Garamond', 'Iowan Old Style', Georgia, serif;    /* body + score */
+  --font-sans:    'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif; /* UI */
+  --font-music:   'Bravura', 'EB Garamond', serif;                     /* notation glyphs */
+
+  /* ---- Weights ---- */
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
+
+  /* ---- Type scale (rem, editorial) ---- */
+  --text-xs:   0.75rem;   /* 12px — micro labels, table meta          */
+  --text-sm:   0.8125rem; /* 13px — UI controls, captions             */
+  --text-base: 0.9375rem; /* 15px — dense UI body                     */
+  --text-md:   1.0625rem; /* 17px — reading body (serif)              */
+  --text-lg:   1.375rem;  /* 22px — subheads                          */
+  --text-xl:   1.875rem;  /* 30px — section titles                    */
+  --text-2xl:  2.625rem;  /* 42px — page display titles               */
+  --text-3xl:  3.75rem;   /* 60px — hero display                      */
+  --text-4xl:  5rem;      /* 80px — grand hero / script               */
+
+  /* ---- Line heights ---- */
+  --leading-tight:  1.08;
+  --leading-snug:   1.24;
+  --leading-normal: 1.5;
+  --leading-relaxed:1.7;
+
+  /* ---- Tracking ---- */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+  --tracking-caps:   0.14em;
+
+  /* ---- Semantic roles ---- */
+  --role-display-font: var(--font-display);
+  --role-body-font:    var(--font-serif);
+  --role-ui-font:      var(--font-sans);
+
+  /* eyebrow / small-caps label */
+  --eyebrow-size:    var(--text-xs);
+  --eyebrow-track:   var(--tracking-caps);
+  --eyebrow-weight:  var(--fw-semibold);
+}
