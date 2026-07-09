@@ -1,8 +1,32 @@
 <script setup>
-// App shell. Real navigation (TopChrome) and pages arrive in Phase 3; for now
-// this just hosts the router so the skeleton runs end to end.
+// App shell: the top chrome on every page, with the routed page below it.
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import TopChrome from '@/components/TopChrome.vue'
+
+const auth = useAuthStore()
+
+// On startup, if a saved token exists, quietly re-fetch the user from the server
+// to confirm the session is still valid (and pick up any profile changes). An
+// expired token signs us out cleanly; see the store's refresh().
+onMounted(() => {
+  auth.refresh()
+})
 </script>
 
 <template>
-  <router-view />
+  <div class="app-shell">
+    <TopChrome />
+    <main class="app-main">
+      <router-view />
+    </main>
+  </div>
 </template>
+
+<style scoped>
+.app-main {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-9) var(--space-7) var(--space-12);
+}
+</style>

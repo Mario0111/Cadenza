@@ -49,15 +49,21 @@ Goal: scores persist per user with ownership enforced.
 
 ## Phase 3 — frontend shell, routing, auth pages, Pinia auth store
 Goal: you can register/log in from the UI and move between protected pages.
-- [ ] Vue Router with routes: Landing (public), Login/Register, Editor, Library, Profile,
+- [x] Vue Router with routes: Landing (public), Login/Register, Editor, Library, Profile,
       Admin, Print; auth guards (protected + admin-only)
-- [ ] Pinia `auth` store: token persistence, current user, login/register/logout actions
-- [ ] API layer (`src/api/`) with fetch wrappers + auth header injection
-- [ ] Shared DS components as Vue SFCs: `PaperCard`, `QuietMark`, `AppButton`, `TopChrome`, form inputs
-- [ ] Landing page (public), Login/Register pages with client-side validation
+- [x] Pinia `auth` store: token persistence, current user, login/register/logout actions
+- [x] API layer (`src/api/`) with fetch wrappers + auth header injection
+      (`token.js`, `client.js` + `ApiError`, `auth.js`, `users.js`, `scores.js`)
+- [x] Shared DS components as Vue SFCs: `PaperCard`, `QuietMark`, `AppButton`, `TopChrome`,
+      form inputs (`FormField`)
+- [x] Landing page (public), Login/Register pages with client-side validation
       (required, email format, min password length, confirmation match, inline quiet-mark errors)
-- [ ] App shell / navigation (TopChrome)
-- [ ] Manual test: register → land on library, logout, guard redirects
+      — pure validators in `lib/formValidation.js`, mirroring the backend messages
+- [x] App shell / navigation (TopChrome)
+- [~] Manual test: register → land on library, logout, guard redirects
+      (build passes; guard redirects + client validation + DS styling verified in the
+      browser with the backend down; register/login round-trip pending Mario's run with
+      MongoDB + server up)
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---
