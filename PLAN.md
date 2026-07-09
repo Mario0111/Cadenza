@@ -35,12 +35,14 @@ Goal: a running client and server skeleton, and a working account system.
 
 ## Phase 2 — score data model + score CRUD API
 Goal: scores persist per user with ownership enforced.
-- [ ] `Score` model (title, description, timeSignature, keySignature, displayMode, owner,
+- [x] `Score` model (title, description, timeSignature, keySignature, displayMode, owner,
       measures[] as JSON) — no rhythmic validation at the DB layer (per philosophy)
-- [ ] `GET /api/scores` (owner's list), `POST /api/scores`
-- [ ] `GET/PUT/DELETE /api/scores/:id` with ownership checks (403 if not owner)
-- [ ] Input validation on every write endpoint; validators per route
-- [ ] Manual test: full CRUD as two different users, confirm isolation
+- [x] `GET /api/scores` (owner's list), `POST /api/scores`
+- [x] `GET/PUT/DELETE /api/scores/:id` with ownership checks (403 if not owner)
+- [x] Input validation on every write endpoint; validators per route
+      (`loadOwnedScore` ownership middleware keeps the item routes thin)
+- [~] Manual test: full CRUD as two different users, confirm isolation
+      (imports/build verified automatically; DB round-trip pending Mario's run)
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---
