@@ -19,7 +19,7 @@ export async function requireAuth(req, res, next) {
       payload = jwt.verify(token, config.jwtSecret)
     } catch {
       // Covers expired, malformed, or wrong-signature tokens.
-      throw new AppError(401, 'Your session has expired or the token is invalid.')
+      throw new AppError(401, 'Your session has ended — please sign in again.')
     }
 
     // `sub` is the JWT subject claim — the user id we signed the token with.

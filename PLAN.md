@@ -188,9 +188,25 @@ Split into sub-phases; each is its own review gate.
 ---
 
 ## Phase 8 — validation polish, error handling review, README
-- [ ] Sweep validation on every write endpoint; consistent status codes
-- [ ] Review centralized error handling front and back; quiet-mark error copy throughout
-- [ ] Remove any remaining mock/placeholder data
-- [ ] `README.md`: setup steps, data model explanation, full endpoint list
-- [ ] Final pass against the core design philosophy (no auto-fill, manual tabs, quiet marks)
+- [x] Sweep validation on every write endpoint; consistent status codes
+      (all five write endpoints validated field-by-field; exercised 400/401/
+      403/404/409 live against the API, including ownership vs. admin 403s,
+      malformed-id 404s and both admin guardrails. One gap found + fixed:
+      a malformed JSON body fell through to a 500 — the error handler now
+      answers 400 with quiet copy)
+- [x] Review centralized error handling front and back; quiet-mark error copy throughout
+      (server errorHandler + client ApiError paths reviewed end to end; swept
+      every user-facing string — one server message said "the token is
+      invalid", reworded to "Your session has ended — please sign in again.")
+- [x] Remove any remaining mock/placeholder data
+      (verified none left: no mock/sample/TODO/console.log in client or server
+      source; input placeholders and CSS token names are the only matches)
+- [x] `README.md`: setup steps, data model explanation, full endpoint list
+      (what Cadenza is + the paper philosophy, clean-machine setup incl. .env
+      and admin seed, User/Score model with the note-event shape, every
+      endpoint with method/auth/status codes, project structure)
+- [x] Final pass against the core design philosophy (no auto-fill, manual tabs, quiet marks)
+      (score store re-read action by action: notes insert exactly one event,
+      deletes never re-flow, tabs/fingering all manual and nullable, quiet
+      marks are the only rhythm feedback and stay off the print sheet)
 - 🛑 **Stop, summarize — project complete.**

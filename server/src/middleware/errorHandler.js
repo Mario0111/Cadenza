@@ -10,6 +10,12 @@ export function notFound(req, res) {
 // recognizes an error-handling middleware.
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
+  // express.json() could not parse the request body — the client sent broken
+  // JSON. That's a bad request (400), not a server fault (500).
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'That request could not be read — please try again.' })
+  }
+
   // MongoDB duplicate-key error (e.g. the unique email index). 409 Conflict.
   if (err.code === 11000) {
     return res.status(409).json({ error: 'That email is already registered.' })
