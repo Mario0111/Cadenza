@@ -2,25 +2,38 @@
 //
 // This is a Pinia store rather than EditorPage-local state for two reasons:
 // several components need the same state (the toolbar edits it, the canvas
-// renders it, the page's keyboard handler drives it), and Phase 4c will load
-// and save this exact state through the API — a store means that wiring lands
-// in one place. Every edit is a named action, so each mutation of the score
-// can be read, explained and tested on its own.
+// renders it, the page's keyboard handler drives it), and the load/save wiring
+// lives here too, so the working copy and its API round-trips sit in one place.
+// Every edit is a named action, so each mutation of the score can be read,
+// explained and tested on its own.
 //
 // The core philosophy holds everywhere here: an action changes exactly what it
 // says and nothing else. Adding a note never inserts rests or pads a measure;
-// deleting never re-flows anything; empty measures stay empty.
+// deleting never re-flows anything; empty measures stay empty. Tabs are manual:
+// strings and frets are set by hand, never derived from pitches.
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { createMeasure, defaultNextNote } from '@/lib/scoreModel'
-import { makeSampleScore } from '@/lib/sampleScore'
+import { createScore, createMeasure, defaultNextNote } from '@/lib/scoreModel'
 import { shiftPitch, setPitchLetter } from '@/lib/pitches'
+import * as scoresApi from '@/api/scores'
 
 export const useScoreStore = defineStore('score', () => {
-  // TEMPORARY seed: the Phase 4a sample score, so there is material to edit
-  // before load/save arrives in 4c. No mock data ships in the final app.
-  const score = ref(makeSampleScore('both'))
+  // The working copy — always a full score model, blank until one is loaded.
+  const score = ref(createScore())
+
+  // The saved score's database id, or null while the score only exists here.
+  // This is what decides whether saving creates (POST) or updates (PUT).
+  const scoreId = ref(null)
+
+  // Quiet save/load state for the editor's status line. `dirty` means the
+  // working copy has edits the server hasn't seen; every mutating action
+  // below calls markDirty().
+  const dirty = ref(false)
+  const loading = ref(false)
+  const saving = ref(false)
+  const loadError = ref('')
+  const saveError = ref('')
 
   // What is selected: null, or { measureIndex, noteIndex } — with noteIndex
   // null when a measure is selected but no note in it (e.g. after deleting a
@@ -52,6 +65,126 @@ export const useScoreStore = defineStore('score', () => {
     () => Boolean(selection.value) && score.value.measures.length > 1
   )
 
+  function markDirty() {
+    dirty.value = true
+  }
+
+  /* ---- Load / save / new ---------------------------------------------------
+   * The only place the editor talks to the score API. One direction stays
+   * honest: the server hands us a score, we keep a clean working copy of the
+   * model fields, and saving sends those same fields back.
+   */
+
+  /** Start over with a blank score (the /editor route with no id). */
+  function startNewScore() {
+    score.value = createScore()
+    scoreId.value = null
+    selection.value = null
+    dirty.value = false
+    loading.value = false
+    saving.value = false
+    loadError.value = ''
+    saveError.value = ''
+  }
+
+  /** Load an existing score (the /editor/:id route) into the working copy. */
+  async function loadScore(id) {
+    loading.value = true
+    loadError.value = ''
+    saveError.value = ''
+    selection.value = null
+    try {
+      const { score: loaded } = await scoresApi.getScore(id)
+      // Rebuild the working copy from the model fields only, dropping server
+      // bookkeeping (owner, timestamps) — the editor never needs it. A score
+      // saved with no measures still opens with one empty measure to write in.
+      score.value = createScore({
+        title: loaded.title,
+        description: loaded.description,
+        timeSignature: loaded.timeSignature,
+        keySignature: loaded.keySignature,
+        displayMode: loaded.displayMode,
+        measures: loaded.measures?.length ? loaded.measures : [createMeasure()]
+      })
+      scoreId.value = loaded.id
+      dirty.value = false
+    } catch (err) {
+      loadError.value =
+        err.status === 404
+          ? 'That score isn’t in your library anymore.'
+          : err.message
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Save the working copy: create on first save, update after. On the first
+   * save the server assigns the id, which the editor uses to settle the URL.
+   */
+  async function saveScore() {
+    if (saving.value) return
+
+    // The one client-side check, mirroring the server's rule and copy.
+    if (!score.value.title.trim()) {
+      saveError.value = 'Please give your score a title.'
+      return
+    }
+
+    saving.value = true
+    saveError.value = ''
+    const payload = {
+      title: score.value.title,
+      description: score.value.description,
+      timeSignature: score.value.timeSignature,
+      keySignature: score.value.keySignature,
+      displayMode: score.value.displayMode,
+      measures: score.value.measures
+    }
+    try {
+      if (scoreId.value) {
+        await scoresApi.updateScore(scoreId.value, payload)
+      } else {
+        const { score: created } = await scoresApi.createScore(payload)
+        scoreId.value = created.id
+      }
+      dirty.value = false
+    } catch (err) {
+      saveError.value = err.message
+    } finally {
+      saving.value = false
+    }
+  }
+
+  /* ---- Score details -------------------------------------------------------
+   * Title, description, time signature and display mode are score fields like
+   * any other: editing them marks the copy unsaved. Changing the time
+   * signature re-reads the quiet marks against the new capacity — it never
+   * touches the notes themselves.
+   */
+
+  function setTitle(title) {
+    score.value.title = title
+    markDirty()
+  }
+
+  function setDescription(description) {
+    score.value.description = description
+    markDirty()
+  }
+
+  function setTimeSignature(timeSignature) {
+    score.value.timeSignature = timeSignature
+    markDirty()
+  }
+
+  function setDisplayMode(mode) {
+    score.value.displayMode = mode
+    markDirty()
+  }
+
+  /* ---- Selection ----------------------------------------------------------- */
+
   function selectNote(measureIndex, noteIndex) {
     selection.value = { measureIndex, noteIndex }
   }
@@ -68,6 +201,8 @@ export const useScoreStore = defineStore('score', () => {
     pen.value.dotted = next.dotted
   }
 
+  /* ---- Writing notes ------------------------------------------------------- */
+
   /**
    * Write one note (or rest) into a measure at a position — the payload the
    * canvas emits for a staff click. Exactly one note appears; nothing is
@@ -81,6 +216,7 @@ export const useScoreStore = defineStore('score', () => {
     if (!note.isRest && pitch) note.pitches = [pitch]
     measure.notes.splice(insertIndex, 0, note)
     selectNote(measureIndex, insertIndex)
+    markDirty()
   }
 
   /**
@@ -115,6 +251,7 @@ export const useScoreStore = defineStore('score', () => {
     if (selectedNote.value) {
       selectedNote.value.duration = code
       rememberPen(selectedNote.value)
+      markDirty()
     } else {
       pen.value.duration = code
     }
@@ -124,6 +261,7 @@ export const useScoreStore = defineStore('score', () => {
     if (selectedNote.value) {
       selectedNote.value.dotted = !selectedNote.value.dotted
       rememberPen(selectedNote.value)
+      markDirty()
     } else {
       pen.value.dotted = !pen.value.dotted
     }
@@ -134,6 +272,7 @@ export const useScoreStore = defineStore('score', () => {
   function toggleRest() {
     if (selectedNote.value) {
       selectedNote.value.isRest = !selectedNote.value.isRest
+      markDirty()
     } else {
       pen.value.isRest = !pen.value.isRest
     }
@@ -145,6 +284,7 @@ export const useScoreStore = defineStore('score', () => {
     if (!note || note.isRest) return
     // A chord transposes as a block, keeping its shape.
     note.pitches = note.pitches.map((pitch) => shiftPitch(pitch, delta))
+    markDirty()
   }
 
   /**
@@ -156,6 +296,7 @@ export const useScoreStore = defineStore('score', () => {
     const note = selectedNote.value
     if (!note || note.isRest || note.pitches.length !== 1) return
     note.pitches = [setPitchLetter(note.pitches[0], letter)]
+    markDirty()
   }
 
   function deleteSelectedNote() {
@@ -170,7 +311,65 @@ export const useScoreStore = defineStore('score', () => {
         ? Math.min(selection.value.noteIndex, measure.notes.length - 1)
         : null
     }
+    markDirty()
   }
+
+  /* ---- Tab and fingering ---------------------------------------------------
+   * All manual, all optional, all per the data model: strings[] and frets[]
+   * are per-pitch and nullable; leftFinger/rightFinger belong to the whole
+   * note event. Nothing here reads the pitches — tabs are never derived.
+   */
+
+  // Keep strings[]/frets[] the same length as pitches[], padding with null.
+  // Loaded data may predate an edit that changed the pitch count; aligning
+  // here means the per-pitch indexes below always land where they should.
+  function alignTabArrays(note) {
+    const count = note.pitches.length
+    note.strings = Array.from({ length: count }, (_, i) => note.strings?.[i] ?? null)
+    note.frets = Array.from({ length: count }, (_, i) => note.frets?.[i] ?? null)
+  }
+
+  /** Set (or clear, with null) the string for one pitch of the selected note. */
+  function setSelectedString(pitchIndex, string) {
+    const note = selectedNote.value
+    if (!note || note.isRest) return
+    if (string != null && !(Number.isInteger(string) && string >= 1 && string <= 6)) return
+    alignTabArrays(note)
+    if (pitchIndex < 0 || pitchIndex >= note.pitches.length) return
+    note.strings[pitchIndex] = string
+    markDirty()
+  }
+
+  /** Set (or clear, with null) the fret for one pitch of the selected note. */
+  function setSelectedFret(pitchIndex, fret) {
+    const note = selectedNote.value
+    if (!note || note.isRest) return
+    if (fret != null && !(Number.isInteger(fret) && fret >= 0 && fret <= 24)) return
+    alignTabArrays(note)
+    if (pitchIndex < 0 || pitchIndex >= note.pitches.length) return
+    note.frets[pitchIndex] = fret
+    markDirty()
+  }
+
+  /** Left-hand finger for the selected note: 1–4, or null for none. */
+  function setSelectedLeftFinger(finger) {
+    const note = selectedNote.value
+    if (!note || note.isRest) return
+    if (finger != null && !(Number.isInteger(finger) && finger >= 1 && finger <= 4)) return
+    note.leftFinger = finger
+    markDirty()
+  }
+
+  /** Right-hand finger for the selected note: p/i/m/a, or null for none. */
+  function setSelectedRightFinger(finger) {
+    const note = selectedNote.value
+    if (!note || note.isRest) return
+    if (finger != null && !['p', 'i', 'm', 'a'].includes(finger)) return
+    note.rightFinger = finger
+    markDirty()
+  }
+
+  /* ---- Selection movement and measures ------------------------------------- */
 
   /**
    * Walk the selection left/right through the score in written order. From
@@ -205,6 +404,7 @@ export const useScoreStore = defineStore('score', () => {
     const at = selection.value ? selection.value.measureIndex + 1 : measures.length
     measures.splice(at, 0, createMeasure())
     selection.value = { measureIndex: at, noteIndex: null }
+    markDirty()
   }
 
   /** Remove the selected measure — notes and all, no questions, no re-flow. */
@@ -217,16 +417,30 @@ export const useScoreStore = defineStore('score', () => {
       measureIndex: Math.min(selection.value.measureIndex, measures.length - 1),
       noteIndex: null
     }
+    markDirty()
   }
 
   return {
     score,
+    scoreId,
+    dirty,
+    loading,
+    saving,
+    loadError,
+    saveError,
     selection,
     pen,
     selectedMeasure,
     selectedNote,
     activeSettings,
     canRemoveMeasure,
+    startNewScore,
+    loadScore,
+    saveScore,
+    setTitle,
+    setDescription,
+    setTimeSignature,
+    setDisplayMode,
     selectNote,
     clearSelection,
     addNote,
@@ -237,6 +451,10 @@ export const useScoreStore = defineStore('score', () => {
     transposeSelected,
     setSelectedLetter,
     deleteSelectedNote,
+    setSelectedString,
+    setSelectedFret,
+    setSelectedLeftFinger,
+    setSelectedRightFinger,
     moveSelection,
     addMeasure,
     removeSelectedMeasure

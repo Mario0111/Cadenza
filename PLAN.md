@@ -107,12 +107,23 @@ Split into sub-phases; each is its own review gate.
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ### 4c — tab, fingering, quiet mark, mode switch
-- [ ] `FingeringControls.vue`: optional per-pitch string/fret, left-hand 1–4, right-hand p/i/m/a
-- [ ] Render left-hand via `FretHandFinger`, right-hand via `Annotation`
-- [ ] Notes without tab data omitted from the tab stave (no auto-derivation)
-- [ ] Mode switcher (notation / tab / both) on the same data at any time
-- [ ] Measure quiet mark: sum durations vs time signature → subtle icon/tint, no popup/block
-- [ ] Wire editor to save/load via the score API (no mock data)
+- [x] `FingeringControls.vue`: optional per-pitch string/fret, left-hand 1–4, right-hand p/i/m/a
+      (dumb props/emits panel; store actions validate ranges and mark unsaved)
+- [x] Render left-hand via `FretHandFinger`, right-hand via `Annotation` (italic, below)
+- [x] Notes without tab data omitted from the tab stave (no auto-derivation — unchanged
+      from 4a, exercised again in the browser)
+- [x] Mode switcher (notation / tab / both) on the same data at any time
+      (`ModeSwitcher.vue`, quiet segmented control; displayMode is a saved score field)
+- [x] Measure quiet mark: `measureFullness` per measure → small oxblood icon pinned on the
+      measure + a words-nearby summary line under the manuscript (icon + words, no popups;
+      empty measures are NOT marked — an empty measure is plainly intentional)
+- [x] Wire editor to save/load via the score API: `/editor` = blank, `/editor/:id` = load;
+      save button + Ctrl+S (POST first, then PUT; URL settles onto the new id); title,
+      description and time signature editable in the header; quiet saved/unsaved status;
+      `lib/sampleScore.js` deleted — no mock data left
+- [~] Manual test: exercised end to end in the browser against the real API (write, tab,
+      fingering, quiet mark, all three modes, create + update + reload + missing-score
+      path — no console errors); Mario's hands-on run pending
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---

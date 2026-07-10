@@ -1,19 +1,82 @@
 <script setup>
 // EditorPage — the desk. Composes the writing tools (NoteToolbar), the
-// manuscript (ScoreCanvas, interactive) and the keyboard path, all over the
-// score store. The page itself holds no score state: every edit is a store
-// action, and the canvas redraws from the model — one direction, always.
+// manuscript (ScoreCanvas, interactive), the tab and fingering panel, and the
+// keyboard path, all over the score store. The page itself holds no score
+// state: every edit is a store action, and the canvas redraws from the model —
+// one direction, always.
 //
-// Phase 4b: the score is still the seeded sample (see stores/score.js);
-// loading and saving through the API arrive in 4c.
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+// The page also owns the route side of load/save: /editor starts a blank
+// score, /editor/:id loads a saved one, and the first successful save settles
+// the URL onto the new id.
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import PaperCard from '@/components/PaperCard.vue'
+import QuietMark from '@/components/QuietMark.vue'
+import AppButton from '@/components/AppButton.vue'
 import NoteToolbar from '@/components/editor/NoteToolbar.vue'
 import ScoreCanvas from '@/components/editor/ScoreCanvas.vue'
+import FingeringControls from '@/components/editor/FingeringControls.vue'
+import ModeSwitcher from '@/components/editor/ModeSwitcher.vue'
 import { useScoreStore } from '@/stores/score'
 import { DURATIONS } from '@/lib/durations'
+import { measureFullness } from '@/lib/scoreModel'
 
 const store = useScoreStore()
+const route = useRoute()
+const router = useRouter()
+
+/* ---- Load from the route -------------------------------------------------
+ * /editor/:id opens a saved score; /editor (no id) opens a blank one. The
+ * watch also covers in-app navigation between the two forms of the route —
+ * except right after the first save, when WE moved the URL onto the id the
+ * server just assigned and the working copy is already the right one.
+ */
+
+function openFromRoute() {
+  const id = route.params.id || null
+  if (id === store.scoreId) return
+  if (id) store.loadScore(id)
+  else store.startNewScore()
+}
+
+onMounted(openFromRoute)
+watch(() => route.params.id, openFromRoute)
+
+/* ---- Saving ---------------------------------------------------------------
+ * One path for the button and Ctrl+S. After the save that CREATES the score,
+ * the URL moves to /editor/:id so a refresh reopens the same score.
+ */
+
+async function saveNow() {
+  const wasNew = !store.scoreId
+  await store.saveScore()
+  if (wasNew && store.scoreId) {
+    router.replace({ name: 'editor', params: { id: store.scoreId } })
+  }
+}
+
+// The quiet saved/unsaved line next to the save button.
+const saveStatus = computed(() => {
+  if (store.saving) return 'Saving…'
+  if (store.dirty) return 'Unsaved changes'
+  return store.scoreId ? 'Saved' : 'Not saved yet'
+})
+
+function onGlobalKeydown(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault() // the browser's "save page" dialog is never useful here
+    saveNow()
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', onGlobalKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
+
+/* ---- Score details --------------------------------------------------------
+ * Common guitar-friendly time signatures. The model stores any "n/d" string;
+ * offering a list just keeps the input tidy and typo-free.
+ */
+const TIME_SIGNATURES = ['2/4', '3/4', '4/4', '5/4', '6/8', '9/8', '12/8', '2/2']
 
 /* ---- Quiet status line for the toolbar ---------------------------------- */
 
@@ -32,6 +95,27 @@ const status = computed(() => {
   const dotted = store.pen.dotted ? 'dotted ' : ''
   const kind = store.pen.isRest ? 'rests' : 'notes'
   return `Writing ${dotted}${durationLabel.value} ${kind}`
+})
+
+/* ---- The quiet marks' words -----------------------------------------------
+ * The canvas pins a small icon on each measure that doesn't add up; the words
+ * live here, nearby, so the observation is never colour (or hover) alone.
+ */
+
+const fullnessSummary = computed(() => {
+  const timeSignature = store.score.timeSignature
+  const marked = []
+  store.score.measures.forEach((measure, index) => {
+    const { state } = measureFullness(measure, timeSignature)
+    if (state === 'partial' || state === 'over') marked.push(index + 1)
+  })
+  if (!marked.length) return ''
+
+  if (marked.length === 1) {
+    return `Measure ${marked[0]} doesn't add up to ${timeSignature} — that's allowed; the small mark shows where.`
+  }
+  const listed = `${marked.slice(0, -1).join(', ')} and ${marked[marked.length - 1]}`
+  return `Measures ${listed} don't add up to ${timeSignature} — that's allowed; the small marks show where.`
 })
 
 /* ---- Keyboard input ------------------------------------------------------
@@ -89,54 +173,130 @@ onBeforeUnmount(() => window.removeEventListener('resize', measurePage))
 
 <template>
   <section class="editor">
-    <header class="editor__head">
-      <p class="cadenza-eyebrow">The desk</p>
-      <h1 class="editor__title">{{ store.score.title }}</h1>
-    </header>
+    <!-- A score that isn't here anymore (or failed to load) — a quiet dead end
+         with a way forward, never a bare error. -->
+    <template v-if="store.loadError">
+      <header class="editor__head">
+        <p class="cadenza-eyebrow">The desk</p>
+      </header>
+      <QuietMark :message="store.loadError" />
+      <div class="editor__error-actions">
+        <AppButton variant="secondary" :to="{ name: 'library' }">Back to your library</AppButton>
+      </div>
+    </template>
 
-    <NoteToolbar
-      :duration="store.activeSettings.duration"
-      :dotted="store.activeSettings.dotted"
-      :is-rest="store.activeSettings.isRest"
-      :has-selection="Boolean(store.selectedNote)"
-      :can-remove-measure="store.canRemoveMeasure"
-      :status="status"
-      @set-duration="store.setDuration"
-      @toggle-dot="store.toggleDot"
-      @toggle-rest="store.toggleRest"
-      @delete-note="store.deleteSelectedNote"
-      @add-measure="store.addMeasure"
-      @remove-measure="store.removeSelectedMeasure"
-    />
+    <p v-else-if="store.loading" class="editor__loading">Fetching your score…</p>
 
-    <PaperCard class="editor__plate">
-      <div
-        ref="page"
-        class="editor__page"
-        tabindex="0"
-        aria-label="Manuscript. Click a line or space to write a note, or use the
-          keyboard: arrows move and transpose, letters a to g set the pitch,
-          digits one to six set the duration, n writes the next note."
-        @keydown="onKeydown"
-      >
-        <ScoreCanvas
-          :score="store.score"
-          :selection="store.selection"
-          :page-width="pageWidth"
-          interactive
-          @select="({ measureIndex, noteIndex }) => store.selectNote(measureIndex, noteIndex)"
-          @add-note="store.addNote"
-          @background-click="store.clearSelection"
+    <template v-else>
+      <header class="editor__head">
+        <p class="cadenza-eyebrow">The desk</p>
+
+        <div class="editor__meta">
+          <div class="editor__titles">
+            <input
+              class="editor__title-input"
+              type="text"
+              aria-label="Score title"
+              placeholder="Untitled score"
+              :value="store.score.title"
+              @input="store.setTitle($event.target.value)"
+            />
+            <input
+              class="editor__description-input"
+              type="text"
+              aria-label="Score description"
+              placeholder="Add a description — optional"
+              :value="store.score.description"
+              @input="store.setDescription($event.target.value)"
+            />
+          </div>
+
+          <div class="editor__controls">
+            <label class="editor__time">
+              <span class="editor__time-label">Time</span>
+              <select
+                class="editor__time-select"
+                :value="store.score.timeSignature"
+                @change="store.setTimeSignature($event.target.value)"
+              >
+                <option v-for="ts in TIME_SIGNATURES" :key="ts" :value="ts">{{ ts }}</option>
+              </select>
+            </label>
+
+            <ModeSwitcher
+              :model-value="store.score.displayMode"
+              @update:model-value="store.setDisplayMode"
+            />
+
+            <div class="editor__save">
+              <AppButton variant="primary" :loading="store.saving" @click="saveNow">
+                Save
+              </AppButton>
+              <span class="editor__save-status" role="status">{{ saveStatus }}</span>
+            </div>
+          </div>
+        </div>
+
+        <QuietMark v-if="store.saveError" :message="store.saveError" />
+      </header>
+
+      <NoteToolbar
+        :duration="store.activeSettings.duration"
+        :dotted="store.activeSettings.dotted"
+        :is-rest="store.activeSettings.isRest"
+        :has-selection="Boolean(store.selectedNote)"
+        :can-remove-measure="store.canRemoveMeasure"
+        :status="status"
+        @set-duration="store.setDuration"
+        @toggle-dot="store.toggleDot"
+        @toggle-rest="store.toggleRest"
+        @delete-note="store.deleteSelectedNote"
+        @add-measure="store.addMeasure"
+        @remove-measure="store.removeSelectedMeasure"
+      />
+
+      <div class="editor__body">
+        <PaperCard class="editor__plate">
+          <div
+            ref="page"
+            class="editor__page"
+            tabindex="0"
+            aria-label="Manuscript. Click a line or space to write a note, or use the
+              keyboard: arrows move and transpose, letters a to g set the pitch,
+              digits one to six set the duration, n writes the next note."
+            @keydown="onKeydown"
+          >
+            <ScoreCanvas
+              :score="store.score"
+              :selection="store.selection"
+              :page-width="pageWidth"
+              interactive
+              @select="({ measureIndex, noteIndex }) => store.selectNote(measureIndex, noteIndex)"
+              @add-note="store.addNote"
+              @background-click="store.clearSelection"
+            />
+          </div>
+        </PaperCard>
+
+        <FingeringControls
+          class="editor__fingering"
+          :note="store.selectedNote"
+          @set-string="({ pitchIndex, value }) => store.setSelectedString(pitchIndex, value)"
+          @set-fret="({ pitchIndex, value }) => store.setSelectedFret(pitchIndex, value)"
+          @set-left-finger="store.setSelectedLeftFinger"
+          @set-right-finger="store.setSelectedRightFinger"
         />
       </div>
-    </PaperCard>
 
-    <p class="editor__hint">
-      Click a line or space to write a note; click a note to pick it up again.
-      With the manuscript focused: arrows move and transpose, a–g re-letter,
-      1–6 set the duration, period dots it, r writes rests, n adds the next
-      note, Delete removes, Escape puts the pen down.
-    </p>
+      <QuietMark v-if="fullnessSummary" :message="fullnessSummary" />
+
+      <p class="editor__hint">
+        Click a line or space to write a note; click a note to pick it up again.
+        With the manuscript focused: arrows move and transpose, a–g re-letter,
+        1–6 set the duration, period dots it, r writes rests, n adds the next
+        note, Delete removes, Escape puts the pen down. Ctrl+S saves.
+      </p>
+    </template>
   </section>
 </template>
 
@@ -145,12 +305,149 @@ onBeforeUnmount(() => window.removeEventListener('resize', measurePage))
   margin-bottom: var(--space-5);
 }
 
-.editor__title {
-  font-size: var(--text-xl);
+/* Title on the left, working controls on the right — the manuscript's
+   editorial asymmetry carried up into the chrome. Wraps quietly when narrow. */
+.editor__meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
 }
 
-.editor__plate {
+.editor__titles {
+  flex: 1;
+  min-width: 260px;
+}
+
+/* The title is written directly on the page — an input dressed as a heading.
+   The hairline underneath only appears when you're actually writing in it. */
+.editor__title-input {
+  width: 100%;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  border-bottom: var(--border-hair) solid transparent;
+  transition: var(--t-control);
+}
+
+.editor__title-input:hover,
+.editor__title-input:focus {
+  border-bottom-color: var(--border-strong);
+}
+
+.editor__title-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent-brass);
+}
+
+.editor__description-input {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: var(--border-hair) solid transparent;
+  transition: var(--t-control);
+}
+
+.editor__description-input:hover,
+.editor__description-input:focus {
+  border-bottom-color: var(--border-strong);
+}
+
+.editor__description-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent-brass);
+}
+
+.editor__title-input::placeholder,
+.editor__description-input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.editor__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.editor__time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.editor__time-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.editor__time-select {
+  height: 32px;
+  padding: 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--surface-card);
+  border: var(--border-hair) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition: var(--t-control);
+}
+
+.editor__time-select:focus-visible {
+  outline: none;
+  border-color: var(--accent-brass);
+  box-shadow: var(--shadow-focus);
+}
+
+.editor__save {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* The quiet saved/unsaved line — an observation, not a nag. */
+.editor__save-status {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.editor__loading {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.editor__error-actions {
   margin-top: var(--space-4);
+}
+
+/* Manuscript proud on the left, fingering panel in the margin on the right;
+   the panel drops below on narrow screens. */
+.editor__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--space-4);
+  align-items: start;
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 860px) {
+  .editor__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .editor__page {

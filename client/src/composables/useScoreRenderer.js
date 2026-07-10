@@ -26,7 +26,10 @@ import {
   Voice,
   Formatter,
   Dot,
-  StaveConnector
+  StaveConnector,
+  FretHandFinger,
+  Annotation,
+  Modifier
 } from 'vexflow'
 
 import { toVexflowDuration } from '@/lib/durations'
@@ -44,14 +47,28 @@ const CLEF_ALLOWANCE = 40 // extra width when a measure re-states the clef (line
 const TIME_ALLOWANCE = 26 // extra width for the time signature (very first measure)
 const BARLINE_ALLOWANCE = 16 // slack for the opening barline on interior measures
 const TRAILING_SPACE = 16 // gap left between the last note and the closing barline
-const TAB_OFFSET = 96 // vertical drop from the notation stave to the tab stave
+const TAB_OFFSET = 110 // vertical drop from the notation stave to the tab stave
+
+/*
+ * Extra room above every notation stave for ledger-line territory. VexFlow
+ * itself only reserves 4 line spacings (40px) above the top line, but the
+ * editor's writable range goes up to c/7 — 11 staff steps above the top line,
+ * i.e. 55px — so without this the highest notes are drawn off the top of the
+ * row. 30px of headroom brings the total to 70px, enough for c/7's notehead.
+ * The floor needs room too: c/3 sits 45px below the bottom line, and a
+ * right-hand fingering annotation can hang another ~25px under that — the
+ * row heights below leave space for both.
+ */
+const STAFF_HEADROOM = 30
 
 /**
  * Height of one system (row of measures), which depends on what's stacked in it.
  * "both" carries a notation stave and a tab stave; the single modes carry one.
+ * Rows with a notation stave include its ledger headroom.
  */
 function systemHeight(showNotation, showTab) {
-  if (showNotation && showTab) return 220
+  if (showNotation && showTab) return 264
+  if (showNotation) return 190
   return 130
 }
 
@@ -81,11 +98,31 @@ function toStaveNote(note) {
   const staveNote = new StaveNote({
     keys,
     duration: toVexflowDuration(note.duration, note.isRest),
-    clef: 'treble'
+    clef: 'treble',
+    // Standard engraving: notes above the middle line take a down-stem.
+    // Without this VexFlow stems everything up, and a high note's stem
+    // climbs past the row's headroom.
+    auto_stem: true
   })
   // Dots are attached as modifiers (not baked into the duration string) so the
   // glyph draws AND the note reports the right tick count for spacing.
   if (note.dotted) Dot.buildAndAttach([staveNote], { all: true })
+
+  // Fingering, classical-guitar style — both optional, both manual, rests
+  // carry none. Left hand (1–4) sits beside the notehead as a FretHandFinger;
+  // right hand (p/i/m/a) hangs below the note as an italic Annotation.
+  if (!note.isRest && note.leftFinger != null) {
+    staveNote.addModifier(
+      new FretHandFinger(String(note.leftFinger)).setPosition(Modifier.Position.LEFT),
+      0
+    )
+  }
+  if (!note.isRest && note.rightFinger) {
+    const annotation = new Annotation(note.rightFinger)
+      .setFont('EB Garamond', 12, 'normal', 'italic')
+      .setVerticalJustification(Annotation.VerticalJustify.BOTTOM)
+    staveNote.addModifier(annotation, 0)
+  }
   return staveNote
 }
 
@@ -229,14 +266,16 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
   let tabStave = null
 
   if (showNotation) {
-    notationStave = new Stave(plan.x, y, plan.width)
+    // The stave sits below its ledger headroom so high notes stay on the page.
+    notationStave = new Stave(plan.x, y + STAFF_HEADROOM, plan.width)
     if (plan.isLineStart) notationStave.addClef('treble')
     if (plan.showTimeSignature) notationStave.addTimeSignature(score.timeSignature)
     notationStave.setContext(context).draw()
   }
 
   if (showTab) {
-    const tabY = showNotation ? y + TAB_OFFSET : y
+    // Tab has no ledger territory of its own; alone it needs no headroom.
+    const tabY = showNotation ? y + STAFF_HEADROOM + TAB_OFFSET : y
     tabStave = new TabStave(plan.x, tabY, plan.width)
     if (plan.isLineStart) tabStave.addTabGlyph() // the "TAB" clef
     tabStave.setContext(context).draw()
