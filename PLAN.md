@@ -145,9 +145,17 @@ Split into sub-phases; each is its own review gate.
 ---
 
 ## Phase 6 — admin dashboard
-- [ ] Admin routes (backend): CRUD over all users and all scores (admin middleware)
-- [ ] `AdminPage` (admin-only route): manage users and scores
-- [ ] Manual test as admin vs normal user (403 path)
+- [x] Admin routes (backend): CRUD over all users and all scores (admin middleware)
+      (`requireAdmin` after `requireAuth`; list/update/delete users, list/delete
+      scores with owner populated; guardrails: no self-delete, no self-demote,
+      deleting a user deletes their scores)
+- [x] `AdminPage` (admin-only route): manage users and scores
+      (two tables on paper cards; `AdminUserRow`/`AdminScoreRow` follow the
+      ScoreCard pattern — inline edit and inline delete confirm, no popups)
+- [~] Manual test as admin vs normal user (403 path)
+      (exercised end to end in the browser and against the API: admin CRUD,
+      guardrails, cascade delete, 401/403/404/409 paths, guard redirect;
+      Mario's hands-on run pending)
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---

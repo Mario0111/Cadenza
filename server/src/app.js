@@ -5,6 +5,7 @@ import { config } from './config/env.js'
 import authRoutes from './routes/auth.routes.js'
 import userRoutes from './routes/users.routes.js'
 import scoreRoutes from './routes/scores.routes.js'
+import adminRoutes from './routes/admin.routes.js'
 import { notFound, errorHandler } from './middleware/errorHandler.js'
 
 // Builds the Express app (separate from starting it, so it can be imported
@@ -24,6 +25,7 @@ export function createApp() {
   app.use('/api/auth', authRoutes)
   app.use('/api/users', userRoutes)
   app.use('/api/scores', scoreRoutes)
+  app.use('/api/admin', adminRoutes)
 
   // 404 for unmatched routes, then the centralized error handler last.
   app.use(notFound)
