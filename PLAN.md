@@ -72,11 +72,20 @@ Goal: you can register/log in from the UI and move between protected pages.
 Split into sub-phases; each is its own review gate.
 
 ### 4a — render pipeline (read-only)
-- [ ] `lib/scoreModel.js` + `lib/durations.js` (pure, no Vue): duration→ticks, defaults
-- [ ] `useScoreRenderer` composable: model → VexFlow, **soft-mode voices everywhere**
-- [ ] `ScoreCanvas.vue`: Stave (notation), TabStave, StaveConnector for "tab under notation"
-- [ ] Per-measure width from note density; VexFlow formatter for spacing
-- [ ] Render a hard-coded sample score in all three display modes
+- [x] `lib/scoreModel.js` + `lib/durations.js` (pure, no Vue): duration→ticks, dotted,
+      next-note defaults, measure fullness — 20 assertions pass headlessly
+- [x] `useScoreRenderer` composable: model → VexFlow, **soft-mode voices everywhere**
+      (`setStrict(false)` + `Voice.Mode.SOFT`)
+- [x] `ScoreCanvas.vue`: Stave (notation), TabStave, StaveConnector for "tab under notation";
+      honors displayMode (notation | tab | both)
+- [x] Per-measure width from note density (`preCalculateMinTotalWidth`), clamped and
+      line-wrapped; VexFlow formatter for spacing
+- [x] Render a hard-coded sample score in all three display modes (`lib/sampleScore.js`,
+      shown on the Editor page) — chord, dotted note, rest, tab-less note, overfull and
+      empty measures all included
+- [~] Installed `vexflow@4` (4.2.5) — wasn't a Phase 3 dep. Build passes; VexFlow API
+      usage verified against the installed version. Visual review of the rendered score
+      pending Mario's run.
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ### 4b — note input + editing
