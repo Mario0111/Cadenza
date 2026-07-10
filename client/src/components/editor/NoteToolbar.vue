@@ -3,7 +3,9 @@
 // delete, and the measure controls. Deliberately dumb: it renders the settings
 // it is given and emits intents; the score store decides what they mean
 // (edit the selected note, or set the pen for the next one).
-import { DURATIONS } from '@/lib/durations'
+// The duration figures are also draggable: dragging one onto the manuscript is
+// how a note is written (the drop lands in ScoreCanvas).
+import { DURATIONS, FIGURE_DRAG_TYPE } from '@/lib/durations'
 
 defineProps({
   // The settings on display — the selected note's, or the pen's.
@@ -39,7 +41,15 @@ const DURATION_GLYPHS = {
 const REST_GLYPH = ''
 
 // Keyboard hints for the tooltips: 1–6 mirror the durations' order.
-const durationTitle = (option, index) => `${option.label} note — key ${index + 1}`
+const durationTitle = (option, index) =>
+  `${option.label} note — drag onto the staff to write it, or key ${index + 1}`
+
+// Dragging a figure carries its duration code; the manuscript's drop handler
+// reads it back and writes the note there.
+function onFigureDragStart(event, code) {
+  event.dataTransfer.setData(FIGURE_DRAG_TYPE, code)
+  event.dataTransfer.effectAllowed = 'copy'
+}
 </script>
 
 <template>
@@ -55,6 +65,8 @@ const durationTitle = (option, index) => `${option.label} note — key ${index +
         :title="durationTitle(option, index)"
         :aria-label="durationTitle(option, index)"
         :aria-pressed="duration === option.code"
+        draggable="true"
+        @dragstart="onFigureDragStart($event, option.code)"
         @click="$emit('set-duration', option.code)"
       >
         <span class="note-toolbar__glyph" aria-hidden="true">{{ DURATION_GLYPHS[option.code] }}</span>

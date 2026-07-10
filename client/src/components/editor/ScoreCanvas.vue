@@ -2,12 +2,14 @@
 // ScoreCanvas — the rendering of one score model. It owns a plain container
 // element and hands it to the VexFlow renderer; when the score, the selection
 // or the displayMode changes, it re-renders. The component never mutates the
-// model: in interactive mode it only TRANSLATES clicks into events (select a
-// note, add a note at a staff position) and lets the owner decide what to do,
-// keeping data → render strictly one-way.
+// model: in interactive mode it only TRANSLATES gestures into events (a click
+// selects a note; a figure dragged from the toolbar and dropped on the staff
+// adds one) and lets the owner decide what to do, keeping data → render
+// strictly one-way.
 import { ref, watch, onMounted } from 'vue'
 import { useScoreRenderer } from '@/composables/useScoreRenderer'
 import { measureFullness } from '@/lib/scoreModel'
+import { FIGURE_DRAG_TYPE } from '@/lib/durations'
 import { pitchAt, findMeasureAt, findNoteAt, insertIndexForX } from '@/lib/staffGeometry'
 
 const props = defineProps({
@@ -17,7 +19,7 @@ const props = defineProps({
   pageWidth: { type: Number, default: 680 },
   // The selected note, drawn in brass: { measureIndex, noteIndex } | null.
   selection: { type: Object, default: null },
-  // When true, clicks on the score emit the events below.
+  // When true, clicks and figure drops on the score emit the events below.
   interactive: { type: Boolean, default: false },
   // The measure quiet marks are editor feedback, not part of the engraved
   // sheet — the print/PDF view turns them off.
@@ -86,46 +88,73 @@ watch(() => props.selection, draw)
 watch(() => props.pageWidth, draw)
 
 /**
+ * A pointer event's coordinates in the SVG's own space. The SVG is drawn 1:1
+ * (no viewBox scaling), so the offset from its top-left corner is the VexFlow
+ * coordinate. Returns null when nothing is rendered yet.
+ */
+function pointFrom(event) {
+  const svg = host.value ? host.value.querySelector('svg') : null
+  if (!svg) return null
+  const rect = svg.getBoundingClientRect()
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+}
+
+/**
  * A click, mapped against the layout report:
- *   on a drawn note        → 'select' that note
- *   on a writable spot     → 'add-note' at the snapped pitch and x-position
- *   anywhere else          → 'background-click' (the owner clears selection)
+ *   on a drawn note  → 'select' that note
+ *   anywhere else    → 'background-click' (the owner clears selection)
+ * Writing happens by dropping a figure (see onDrop), not by clicking.
  */
 function onClick(event) {
   if (!props.interactive || !layout) return
+  const point = pointFrom(event)
+  if (!point) return
 
-  // Click coordinates in the SVG's own space. The SVG is drawn 1:1 (no viewBox
-  // scaling), so the offset from its top-left corner is the VexFlow coordinate.
-  const svg = host.value ? host.value.querySelector('svg') : null
-  if (!svg) return
-  const rect = svg.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-
-  const measure = findMeasureAt(layout, x, y)
-  if (!measure) {
-    emit('background-click')
-    return
-  }
-
-  const hit = findNoteAt(measure, x)
+  const measure = findMeasureAt(layout, point.x, point.y)
+  const hit = measure ? findNoteAt(measure, point.x) : null
   if (hit) {
     emit('select', { measureIndex: measure.measureIndex, noteIndex: hit.noteIndex })
-    return
-  }
-
-  // Not on a note: if the click is inside the staff's writable band this is
-  // note input; otherwise (e.g. on the tab stave) it is just a stray click.
-  const pitch = pitchAt(y, measure)
-  if (pitch) {
-    emit('add-note', {
-      measureIndex: measure.measureIndex,
-      insertIndex: insertIndexForX(measure, x),
-      pitch
-    })
   } else {
     emit('background-click')
   }
+}
+
+// The browser only allows a drop where dragover is cancelled — so we cancel it
+// exactly when the drag carries a toolbar figure, and nowhere else. (The
+// payload itself is read in onDrop; during dragover only the types are
+// visible, by drag-and-drop design.)
+function onDragOver(event) {
+  if (!props.interactive) return
+  if (!event.dataTransfer.types.includes(FIGURE_DRAG_TYPE)) return
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'copy'
+}
+
+/**
+ * A dropped figure, mapped against the layout report: inside a measure's
+ * writable band → 'add-note' with the figure's duration, at the snapped pitch
+ * and x-position. Anywhere else (the tab stave, the margins) the drop quietly
+ * does nothing — no note appears where none was aimed.
+ */
+function onDrop(event) {
+  if (!props.interactive || !layout) return
+  const duration = event.dataTransfer.getData(FIGURE_DRAG_TYPE)
+  if (!duration) return
+  event.preventDefault()
+
+  const point = pointFrom(event)
+  if (!point) return
+  const measure = findMeasureAt(layout, point.x, point.y)
+  if (!measure) return
+
+  const pitch = pitchAt(point.y, measure)
+  if (!pitch) return
+  emit('add-note', {
+    measureIndex: measure.measureIndex,
+    insertIndex: insertIndexForX(measure, point.x),
+    pitch,
+    duration
+  })
 }
 </script>
 
@@ -138,6 +167,8 @@ function onClick(event) {
       :class="{ 'score-canvas--interactive': interactive }"
       aria-label="Rendered score"
       @click="onClick"
+      @dragover="onDragOver"
+      @drop="onDrop"
     ></div>
 
     <!-- Quiet marks, pinned over the measures they observe. The icon is
@@ -195,7 +226,8 @@ function onClick(event) {
   color: var(--text-primary);
 }
 
-/* A crosshair quietly signals "you can write here" without any chrome. */
+/* A crosshair quietly signals the manuscript is live — figures dropped here
+   become notes, and the notes themselves can be picked up with a click. */
 .score-canvas--interactive {
   cursor: crosshair;
 }

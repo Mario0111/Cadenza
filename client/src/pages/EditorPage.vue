@@ -257,9 +257,10 @@ function onKeydown(event) {
           <div
             class="editor__page"
             tabindex="0"
-            aria-label="Manuscript. Click a line or space to write a note, or use the
-              keyboard: arrows move and transpose, letters a to g set the pitch,
-              digits one to six set the duration, n writes the next note."
+            aria-label="Manuscript. Drag a figure from the toolbar onto a line or
+              space to write a note, or use the keyboard: arrows move and
+              transpose, letters a to g set the pitch, digits one to six set
+              the duration, n writes the next note."
             @keydown="onKeydown"
           >
             <ScoreCanvas
@@ -287,10 +288,11 @@ function onKeydown(event) {
       <QuietMark v-if="fullnessSummary" :message="fullnessSummary" />
 
       <p class="editor__hint">
-        Click a line or space to write a note; click a note to pick it up again.
-        With the manuscript focused: arrows move and transpose, a–g re-letter,
-        1–6 set the duration, period dots it, r writes rests, n adds the next
-        note, Delete removes, Escape puts the pen down. Ctrl+S saves.
+        Drag a figure from the toolbar onto a line or space to write a note;
+        click a note to pick it up again. With the manuscript focused: arrows
+        move and transpose, a–g re-letter, 1–6 set the duration, period dots
+        it, r writes rests, n adds the next note, Delete removes, Escape puts
+        the pen down. Ctrl+S saves.
       </p>
     </template>
   </section>

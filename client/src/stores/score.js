@@ -205,12 +205,16 @@ export const useScoreStore = defineStore('score', () => {
 
   /**
    * Write one note (or rest) into a measure at a position — the payload the
-   * canvas emits for a staff click. Exactly one note appears; nothing is
-   * padded, completed or corrected.
+   * canvas emits for a figure dropped on the staff. Exactly one note appears;
+   * nothing is padded, completed or corrected.
    */
-  function addNote({ measureIndex, insertIndex, pitch }) {
+  function addNote({ measureIndex, insertIndex, pitch, duration }) {
     const measure = score.value.measures[measureIndex]
     if (!measure) return
+    // A dropped figure writes with its own duration, and the pen adopts it —
+    // the next note keeps defaulting to the last duration used. The keyboard
+    // path passes no duration and simply writes with the pen as it is.
+    if (duration) pen.value.duration = duration
     const note = defaultNextNote(pen.value) // pen's duration + dot
     note.isRest = pen.value.isRest
     if (!note.isRest && pitch) note.pitches = [pitch]

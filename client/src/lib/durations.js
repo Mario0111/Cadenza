@@ -28,6 +28,11 @@ export const DURATIONS = [
 // Fast lookup from a duration code to its base (undotted) tick count.
 const TICKS_BY_CODE = Object.fromEntries(DURATIONS.map((d) => [d.code, d.ticks]))
 
+// The drag-and-drop payload type for a figure dragged from the toolbar onto
+// the manuscript. A custom type means a stray drag (text, a file) never looks
+// like note input; the payload itself is the duration code above.
+export const FIGURE_DRAG_TYPE = 'application/x-cadenza-figure'
+
 /**
  * Ticks for a single note or rest. A dot adds half the base value again
  * (a dotted quarter = quarter + eighth = 1.5 quarters), which is why the base
