@@ -51,6 +51,14 @@ export const useAuthStore = defineStore('auth', () => {
     clearStoredUser()
   }
 
+  // Adopt a fresh user object we already have (e.g. the response of a profile
+  // update) into both the reactive state and the stored copy — the same two
+  // places refresh() writes, just without another network round trip.
+  function setUser(fresh) {
+    user.value = fresh
+    setStoredUser(fresh)
+  }
+
   // Re-fetch the user from the server (called once on app startup). This both
   // confirms the saved token is still valid and picks up any profile changes;
   // a 401 means the token expired or the account is gone, so we sign out.
@@ -69,5 +77,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { token, user, isAuthenticated, isAdmin, register, login, logout, refresh }
+  return { token, user, isAuthenticated, isAdmin, register, login, logout, setUser, refresh }
 })

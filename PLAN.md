@@ -129,9 +129,17 @@ Split into sub-phases; each is its own review gate.
 ---
 
 ## Phase 5 — library + profile pages
-- [ ] `LibraryPage` + `ScoreCard.vue`: list, open, rename, delete, download; empty state
-- [ ] `ProfilePage`: update name, email, password (with validation)
-- [ ] Manual test: create in editor → appears in library → open → rename → delete
+- [x] `LibraryPage` + `ScoreCard.vue`: list (newest first), open, inline rename,
+      delete with an inline confirm step (no browser popups anywhere); quiet
+      loading/error states; empty state via a DS-ported `EmptyState.vue` with a
+      working "New score" (download moved to Phase 7 — it needs the PDF pipeline)
+- [x] `ProfilePage`: update name, email, password through PUT /api/users/me —
+      only changed fields sent, client validation via `lib/formValidation.js`,
+      409/field details as inline quiet marks, password fields clear after
+      saving, auth store + stored user kept in step (`auth.setUser`)
+- [~] Manual test: create in editor → appears in library → open → rename → delete
+      (exercised end to end in the browser against the real API; Mario's
+      hands-on run pending)
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---
@@ -146,7 +154,8 @@ Split into sub-phases; each is its own review gate.
 
 ## Phase 7 — print + PDF export
 - [ ] Print route with `@media print` CSS — score only, on white paper
-- [ ] PDF download: VexFlow → SVG → svg2pdf.js + jsPDF, client-side; single long page ok
+- [ ] PDF download: VexFlow → SVG → svg2pdf.js + jsPDF, client-side; single long page ok;
+      a download action joins the library's `ScoreCard` here (moved from Phase 5)
 - [ ] Manual test: print preview + downloaded PDF match the editor
 - 🛑 **Stop, summarize, wait for review + commit.**
 
