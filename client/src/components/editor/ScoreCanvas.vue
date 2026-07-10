@@ -18,7 +18,10 @@ const props = defineProps({
   // The selected note, drawn in brass: { measureIndex, noteIndex } | null.
   selection: { type: Object, default: null },
   // When true, clicks on the score emit the events below.
-  interactive: { type: Boolean, default: false }
+  interactive: { type: Boolean, default: false },
+  // The measure quiet marks are editor feedback, not part of the engraved
+  // sheet — the print/PDF view turns them off.
+  showMarks: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['select', 'add-note', 'background-click'])
@@ -42,7 +45,7 @@ const quietMarks = ref([])
  * never blocks or corrects — it only points, in words, at what it noticed.
  */
 function buildQuietMarks() {
-  if (!layout) return []
+  if (!layout || !props.showMarks) return []
   const timeSignature = props.score.timeSignature
   const marks = []
   for (const drawn of layout.measures) {

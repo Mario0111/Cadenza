@@ -161,10 +161,28 @@ Split into sub-phases; each is its own review gate.
 ---
 
 ## Phase 7 — print + PDF export
-- [ ] Print route with `@media print` CSS — score only, on white paper
-- [ ] PDF download: VexFlow → SVG → svg2pdf.js + jsPDF, client-side; single long page ok;
+- [x] Print route with `@media print` CSS — score only, on white paper
+      (`PrintPage.vue` replaces the stub: white sheet with title + description
+      engraved on it — Mario's call — quiet marks off, `.no-print` chrome;
+      print.css owns the sheet's white and the print-media rules)
+- [x] PDF download: VexFlow → SVG → svg2pdf.js + jsPDF, client-side; single long page ok;
       a download action joins the library's `ScoreCard` here (moved from Phase 5)
-- [ ] Manual test: print preview + downloaded PDF match the editor
+      (`usePdfExport` composable + pure helpers in `lib/printSheet.js`, 16
+      assertions pass headlessly; "Print or download" also joined the editor's
+      save row; filename from the sanitized title)
+- [x] Review round 1: tab digits were invisible in the PDF (svg2pdf can't read
+      VexFlow's pt font sizes → size 0) — export now stamps each text's computed
+      font onto a clone in px; tab digit masks tightened so the string line just
+      touches the number (renderer post-draw pass, same look on screen and PDF)
+- [x] Review round 2: engraved-page layout everywhere — systems are justified
+      to one straight right edge (last line stays natural width, per Mario), and
+      the editor uses the same fixed 680px page as the print sheet
+      (`SHEET_WIDTH` in lib/printSheet.js), so line breaks match print exactly
+- [~] Manual test: print preview + downloaded PDF match the editor
+      (exercised in the browser against the real API: sheet in all three display
+      modes, PDF bytes verified as a valid single-page PDF, no quiet marks on the
+      sheet, not-found + signed-out paths; Mario's hands-on run of the actual
+      print preview dialog and the downloaded file pending)
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ---

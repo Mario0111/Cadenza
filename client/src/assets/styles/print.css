@@ -1,17 +1,50 @@
 /*
- * Print styles — used by the Print/PDF flow in a later phase. Kept here now so
- * the styles folder matches the planned structure. When printing we want the
- * score on clean white paper, chrome hidden.
+ * Print styles — the print/PDF flow (Phase 7). Two jobs live here:
+ *
+ *   1. The .print-sheet surface. It is the ONE white surface in the app — it
+ *      stands for a real sheet of printer paper, so its white is a literal,
+ *      not a DS token (the DS papers are all warm ivory). This is the only
+ *      place a raw colour is allowed. Overriding --surface-card on the sheet
+ *      keeps the renderer honest too: it clears a little box behind each tab
+ *      digit in that token's colour, which must be white here, not ivory.
+ *
+ *   2. The @media print block. Anything marked .no-print (top chrome, action
+ *      bars) disappears, the app shell's ivory ground and padding go, and the
+ *      sheet lies flat on the printed page — score only, on white paper.
  */
+
+.print-sheet {
+  background: #ffffff;
+  --surface-card: #ffffff;
+}
+
 @media print {
   html,
   body {
     background: #ffffff;
-    color: #000000;
   }
 
   /* Anything marked no-print (top chrome, tool rails, buttons) is hidden. */
   .no-print {
     display: none !important;
+  }
+
+  /* The app shell steps aside: no ivory ground, no desk padding. The
+     !important is load-bearing here and below — component styles are scoped
+     (`.app-main[data-v-…]`) and would otherwise out-rank these plain
+     selectors, exactly like .no-print above. */
+  .app-main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* On paper the sheet needs no dress — the page itself is the paper. */
+  .print-sheet {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    width: auto !important;
   }
 }

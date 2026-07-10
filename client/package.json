@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
     "pinia": "^2.1.7",
+    "svg2pdf.js": "^2.7.0",
     "vexflow": "^4.2.5",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0"

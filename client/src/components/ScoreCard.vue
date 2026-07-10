@@ -161,6 +161,9 @@ const error = ref('')
       <AppButton variant="secondary" :to="{ name: 'editor', params: { id: score.id } }">
         Open
       </AppButton>
+      <AppButton variant="ghost" :to="{ name: 'print', params: { id: score.id } }">
+        Print or download
+      </AppButton>
       <AppButton variant="ghost" @click="startRename">Rename</AppButton>
       <AppButton variant="ghost" @click="askDelete">Delete</AppButton>
     </div>

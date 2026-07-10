@@ -223,6 +223,10 @@ function planMeasures(score, { showNotation, showTab, selection, selectionInk })
  * Pack the planned measures into rows (systems) that fit the page width, giving
  * each its x, width, and whether it starts a line. Standard engraving: every
  * line restates the clef; only the very first measure shows the time signature.
+ *
+ * Then every full row is JUSTIFIED to the page width, so all systems share one
+ * straight right edge — the way an engraved page reads. The last row is left
+ * at its natural width: the music simply ends where it ends.
  */
 function layoutRows(plans, pageWidth) {
   const usable = pageWidth - PAGE_MARGIN
@@ -253,7 +257,36 @@ function layoutRows(plans, pageWidth) {
   })
 
   if (row.length) rows.push(row)
+
+  rows.forEach((packed, rowIndex) => {
+    if (rowIndex < rows.length - 1) justifyRow(packed, pageWidth)
+  })
   return rows
+}
+
+/**
+ * Stretch one row's measures so the line ends exactly at the right margin.
+ * Each measure grows in proportion to its natural width, so a dense measure
+ * takes more of the slack than a sparse one — the formatter then spreads the
+ * notes into the extra room. Packing guarantees the row already fits, so this
+ * only ever stretches (never squeezes), and filling the line outranks the
+ * MAX_MEASURE_WIDTH clamp used while packing.
+ */
+function justifyRow(row, pageWidth) {
+  const target = pageWidth - PAGE_MARGIN * 2
+  const natural = row.reduce((sum, plan) => sum + plan.width, 0)
+  if (natural <= 0) return
+  const stretch = target / natural
+  let x = PAGE_MARGIN
+  row.forEach((plan) => {
+    plan.x = x
+    plan.width = plan.width * stretch
+    x += plan.width
+  })
+  // Rounding drift adds up across the row; pin the last measure's right edge
+  // to the margin exactly so every system shares one straight edge.
+  const last = row[row.length - 1]
+  last.width = PAGE_MARGIN + target - last.x
 }
 
 /**
@@ -339,6 +372,36 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
     }))
   }
   return layout
+}
+
+/*
+ * How much air is left between a tab string line and the digit sitting on it.
+ * VexFlow's own masking box is a generous 2px per side; this brings the line
+ * up so it just touches the number without running through it.
+ */
+const TAB_DIGIT_GAP = 0.5
+
+/**
+ * Tighten the masking boxes behind the tab digits. VexFlow clears a box in
+ * the background colour behind every fret number so the string line doesn't
+ * strike through it, but makes it 2px wider than the glyph on each side —
+ * which reads as a hole in the line rather than a digit resting on it. The
+ * digits' drawn widths are only known after rendering, so this is a small
+ * post-draw pass: find each mask (the only rects carrying the background
+ * fill; each sits right before its digit's <text>) and shrink it to the digit
+ * plus TAB_DIGIT_GAP. Presentation polish only — the model is never touched.
+ */
+function tightenTabMasks(container, paper) {
+  if (!paper) return
+  const svg = container.querySelector('svg')
+  if (!svg) return
+  for (const mask of svg.querySelectorAll(`rect[fill="${paper}"]`)) {
+    const text = mask.nextElementSibling
+    if (!text || text.tagName !== 'text') continue
+    const digitBox = text.getBBox()
+    mask.setAttribute('x', digitBox.x - TAB_DIGIT_GAP)
+    mask.setAttribute('width', digitBox.width + TAB_DIGIT_GAP * 2)
+  }
 }
 
 /**
@@ -434,6 +497,11 @@ export function useScoreRenderer() {
         })
       })
     })
+
+    // With everything drawn (digit widths are only known now), pull the tab
+    // string lines up to their numbers.
+    if (showTab) tightenTabMasks(container, paper)
+
     return layout
   }
 

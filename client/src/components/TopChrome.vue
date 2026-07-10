@@ -17,7 +17,8 @@ function handleLogout() {
 </script>
 
 <template>
-  <header class="top-chrome">
+  <!-- no-print: the chrome never appears on printed pages (see print.css). -->
+  <header class="top-chrome no-print">
     <div class="top-chrome__inner">
       <RouterLink
         class="top-chrome__brand"

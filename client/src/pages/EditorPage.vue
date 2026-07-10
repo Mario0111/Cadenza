@@ -8,7 +8,7 @@
 // The page also owns the route side of load/save: /editor starts a blank
 // score, /editor/:id loads a saved one, and the first successful save settles
 // the URL onto the new id.
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PaperCard from '@/components/PaperCard.vue'
 import QuietMark from '@/components/QuietMark.vue'
@@ -20,6 +20,7 @@ import ModeSwitcher from '@/components/editor/ModeSwitcher.vue'
 import { useScoreStore } from '@/stores/score'
 import { DURATIONS } from '@/lib/durations'
 import { measureFullness } from '@/lib/scoreModel'
+import { SHEET_WIDTH } from '@/lib/printSheet'
 
 const store = useScoreStore()
 const route = useRoute()
@@ -151,24 +152,11 @@ function onKeydown(event) {
 }
 
 /* ---- Page width ----------------------------------------------------------
- * The manuscript wraps its systems to the space it actually has, so the score
- * re-flows tidily when the window is resized.
+ * The manuscript is the SAME fixed-width page the print sheet uses, so what
+ * you write is what prints: identical line breaks, identical justified
+ * systems. On a narrow window the manuscript scrolls sideways instead of
+ * re-flowing (ScoreCanvas's frame owns that scroll).
  */
-
-const page = ref(null)
-const pageWidth = ref(680)
-
-function measurePage() {
-  if (page.value) {
-    pageWidth.value = Math.max(360, page.value.clientWidth)
-  }
-}
-
-onMounted(() => {
-  measurePage()
-  window.addEventListener('resize', measurePage)
-})
-onBeforeUnmount(() => window.removeEventListener('resize', measurePage))
 </script>
 
 <template>
@@ -232,6 +220,15 @@ onBeforeUnmount(() => window.removeEventListener('resize', measurePage))
               <AppButton variant="primary" :loading="store.saving" @click="saveNow">
                 Save
               </AppButton>
+              <!-- Only a saved score can be printed; the print view reads the
+                   saved version, so save first if the status says unsaved. -->
+              <AppButton
+                v-if="store.scoreId"
+                variant="ghost"
+                :to="{ name: 'print', params: { id: store.scoreId } }"
+              >
+                Print or download
+              </AppButton>
               <span class="editor__save-status" role="status">{{ saveStatus }}</span>
             </div>
           </div>
@@ -258,7 +255,6 @@ onBeforeUnmount(() => window.removeEventListener('resize', measurePage))
       <div class="editor__body">
         <PaperCard class="editor__plate">
           <div
-            ref="page"
             class="editor__page"
             tabindex="0"
             aria-label="Manuscript. Click a line or space to write a note, or use the
@@ -269,7 +265,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', measurePage))
             <ScoreCanvas
               :score="store.score"
               :selection="store.selection"
-              :page-width="pageWidth"
+              :page-width="SHEET_WIDTH"
               interactive
               @select="({ measureIndex, noteIndex }) => store.selectNote(measureIndex, noteIndex)"
               @add-note="store.addNote"
