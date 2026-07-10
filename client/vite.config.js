@@ -12,7 +12,9 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
+    // PORT lets tooling ask for another port (e.g. a second dev instance);
+    // day-to-day it stays the default 5173.
+    port: Number(process.env.PORT) || 5173,
     proxy: {
       '/api': 'http://localhost:4000'
     }

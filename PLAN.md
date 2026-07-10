@@ -89,10 +89,21 @@ Split into sub-phases; each is its own review gate.
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ### 4b — note input + editing
-- [ ] `NoteToolbar.vue`: duration, dot, rest, accidentals; next-note duration default
-- [ ] Add note by clicking staff position / entering pitch; clean snapping
-- [ ] Select an existing note to edit or delete; keyboard-friendly input
-- [ ] Add / remove measures freely, including empty ones (no auto-fill anywhere)
+- [x] `NoteToolbar.vue`: duration (w h q 8 16 32), dot, rest; next-note duration default
+      (the "pen" in the score store). Accidentals were not in the 4b brief — deferred.
+- [x] Add note by clicking a staff position — click y → line/space → pitch is pure,
+      commented math in `lib/pitches.js` + `lib/staffGeometry.js` (40 assertions pass
+      headlessly); the renderer returns a layout report, so no reaching into VexFlow
+- [x] Select an existing note (notehead or tab digit) to edit or delete; brass
+      selection tint; full keyboard path (arrows transpose/move, a–g re-letter,
+      1–6 duration, `.` dot, `r` rest, `n`/Enter next note, Delete, Escape)
+- [x] Add / remove measures freely, including empty ones (no auto-fill anywhere);
+      a score keeps at least one measure
+- [x] Pinia `stores/score.js` owns the working score + selection + pen
+      (still seeded from the 4a sample until the API wiring in 4c)
+- [~] Manual test: exercised end to end in the browser (click input, snapping,
+      selection, keyboard editing, measure add/remove — no console errors);
+      Mario's hands-on run pending
 - 🛑 **Stop, summarize, wait for review + commit.**
 
 ### 4c — tab, fingering, quiet mark, mode switch

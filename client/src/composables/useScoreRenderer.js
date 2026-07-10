@@ -9,6 +9,13 @@
  * Voices are ALWAYS soft (setStrict(false) + Voice.Mode.SOFT). Cadenza treats an
  * incomplete or overfull measure as a feature, not an error — strict voices
  * would throw on exactly the "wrong" measures we want to render calmly.
+ *
+ * For the editor, `renderScore` also RETURNS a layout report — each measure's
+ * box and every note's drawn x — so clicks can be mapped back to model
+ * positions (see lib/staffGeometry.js). That keeps the one-way rule honest:
+ * the renderer reports where it drew things; nobody reaches into VexFlow.
+ * A selected note is passed in as a render option and drawn in brass —
+ * selection is view state, never written into the model.
  */
 import {
   Renderer,
@@ -135,13 +142,32 @@ function measureWidth(minContent, { isLineStart, isFirstOverall }) {
  * content minimum width. No positioning yet — that happens once we know how the
  * measures pack into rows.
  */
-function planMeasures(score, { showNotation, showTab }) {
-  return (score.measures || []).map((measure) => {
+function planMeasures(score, { showNotation, showTab, selection, selectionInk }) {
+  return (score.measures || []).map((measure, measureIndex) => {
     const notes = measure.notes || []
     const staveNotes = showNotation ? notes.map(toStaveNote) : []
 
-    // Only notes with tab data reach the tab stave (nulls filtered out).
-    const tabNotes = showTab ? notes.map(toTabNote).filter((n) => n !== null) : []
+    // Only notes with tab data reach the tab stave. Each entry keeps its source
+    // noteIndex so a click on a tab digit can find the model note behind it.
+    const tabEntries = []
+    if (showTab) {
+      notes.forEach((note, noteIndex) => {
+        const tabNote = toTabNote(note)
+        if (tabNote) tabEntries.push({ tabNote, noteIndex })
+      })
+    }
+    const tabNotes = tabEntries.map((entry) => entry.tabNote)
+
+    // The selected note wears brass on every stave it appears on.
+    const isSelectedMeasure =
+      selectionInk && selection && selection.measureIndex === measureIndex
+    if (isSelectedMeasure && selection.noteIndex != null) {
+      const brass = { fillStyle: selectionInk, strokeStyle: selectionInk }
+      const selectedStaveNote = staveNotes[selection.noteIndex]
+      if (selectedStaveNote) selectedStaveNote.setStyle(brass)
+      const selectedTabEntry = tabEntries.find((entry) => entry.noteIndex === selection.noteIndex)
+      if (selectedTabEntry) selectedTabEntry.tabNote.setStyle(brass)
+    }
 
     // Measure the content with throwaway voices so we can size the measure.
     const measuringVoices = []
@@ -152,7 +178,7 @@ function planMeasures(score, { showNotation, showTab }) {
       measuringVoices.push(makeSoftVoice(score.timeSignature).addTickables(tabNotes))
     }
 
-    return { staveNotes, tabNotes, minContent: contentMinWidth(measuringVoices) }
+    return { measureIndex, staveNotes, tabNotes, tabEntries, minContent: contentMinWidth(measuringVoices) }
   })
 }
 
@@ -193,7 +219,11 @@ function layoutRows(plans, pageWidth) {
   return rows
 }
 
-/** Draw one measure's staves and voices at its planned position. */
+/**
+ * Draw one measure's staves and voices at its planned position. Returns what
+ * the editor needs for hit detection: where the notation staff's top line sits
+ * (for pitch snapping) and where each note ended up (for selection).
+ */
 function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
   let notationStave = null
   let tabStave = null
@@ -221,6 +251,14 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
       .draw()
   }
 
+  // The measure's layout report. Line spacing on a VexFlow stave is 10px, and
+  // the top line's y comes off the drawn stave itself.
+  const layout = {
+    topLineY: notationStave ? notationStave.getYForLine(0) : null,
+    lineSpacing: notationStave ? notationStave.getSpacingBetweenLines() : 0,
+    notes: []
+  }
+
   // Build the real voices to draw. An empty measure has no voices — it stays an
   // empty stave, exactly as written (no auto-fill).
   const voices = []
@@ -230,7 +268,7 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
   if (tabStave && plan.tabNotes.length) {
     voices.push({ voice: makeSoftVoice(score.timeSignature).addTickables(plan.tabNotes), stave: tabStave })
   }
-  if (!voices.length) return
+  if (!voices.length) return layout
 
   // Format all of a measure's voices to the same note area so the tab frets sit
   // under their notes. Formatting is joined per-voice (not as one aligned group)
@@ -246,6 +284,36 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
   formatter.format(voices.map((v) => v.voice), formatWidth)
 
   voices.forEach(({ voice, stave }) => voice.draw(context, stave))
+
+  // Note positions are only known after drawing. Prefer the notation stave
+  // (every note event is on it); in tab-only mode fall back to the tab entries,
+  // where a note without tab data simply has no clickable spot.
+  if (plan.staveNotes.length) {
+    layout.notes = plan.staveNotes.map((staveNote, noteIndex) => ({
+      noteIndex,
+      x: staveNote.getAbsoluteX()
+    }))
+  } else {
+    layout.notes = plan.tabEntries.map(({ tabNote, noteIndex }) => ({
+      noteIndex,
+      x: tabNote.getAbsoluteX()
+    }))
+  }
+  return layout
+}
+
+/**
+ * Read a CSS custom property off the container's computed style, trying each
+ * name until one resolves to a literal value. Needed because some tokens are
+ * aliases (var → var → hex) and a browser may hand the var() text back
+ * unresolved — the later names are the alias's plain-hex targets.
+ */
+function resolveToken(styles, ...names) {
+  for (const name of names) {
+    const value = styles.getPropertyValue(name).trim()
+    if (value && !value.startsWith('var(')) return value
+  }
+  return ''
 }
 
 /**
@@ -253,10 +321,14 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
  *   container — a DOM element to draw into (its contents are replaced)
  *   score     — the score model (source of truth)
  *   options.pageWidth — width to wrap systems at (default 680)
+ *   options.selection — { measureIndex, noteIndex } to draw in brass, or null
+ *
+ * Returns the layout report: { pageWidth, measures: [{ measureIndex, x, width,
+ * hitTop, hitBottom, topLineY, lineSpacing, notes: [{ noteIndex, x }] }] }.
  */
 export function useScoreRenderer() {
   function renderScore(container, score, options = {}) {
-    if (!container || !score) return
+    if (!container || !score) return null
 
     // One direction only: wipe the previous SVG before drawing the new state.
     container.innerHTML = ''
@@ -266,7 +338,19 @@ export function useScoreRenderer() {
     const showTab = mode === 'tab' || mode === 'both'
     const pageWidth = options.pageWidth || 680
 
-    const plans = planMeasures(score, { showNotation, showTab })
+    // Resolve the page's colours up front — the ink for drawing, and the brass
+    // for the selected note (applied while planning, before anything draws).
+    const styles = getComputedStyle(container)
+    const ink = styles.color
+    const paper = resolveToken(styles, '--surface-card', '--paper-white')
+    const selectionInk = resolveToken(styles, '--accent-brass', '--brass-600')
+
+    const plans = planMeasures(score, {
+      showNotation,
+      showTab,
+      selection: options.selection || null,
+      selectionInk
+    })
     const rows = layoutRows(plans, pageWidth)
 
     const rowHeight = systemHeight(showNotation, showTab)
@@ -280,8 +364,6 @@ export function useScoreRenderer() {
     // read the resolved colour off the container (ScoreCanvas pins it to
     // --text-primary) so glyphs stay filled and staff lines stroked correctly —
     // no blunt CSS override needed.
-    const styles = getComputedStyle(container)
-    const ink = styles.color
     if (ink) {
       context.setFillStyle(ink)
       context.setStrokeStyle(ink)
@@ -291,16 +373,29 @@ export function useScoreRenderer() {
     // line doesn't run through the digit. VexFlow fills that with white by
     // default, which reads as a white box on the ivory paper — set it to the
     // paper colour instead so the break is invisible but still there.
-    // --surface-card is an alias (var → var → hex); if the browser hands it back
-    // unresolved, fall back to the literal paper token, which is a plain hex.
-    let paper = styles.getPropertyValue('--surface-card').trim()
-    if (!paper || paper.startsWith('var(')) paper = styles.getPropertyValue('--paper-white').trim()
     if (paper) context.setBackgroundFillStyle(paper)
 
+    // Draw, collecting each measure's layout for the editor's hit detection.
+    // hitTop/hitBottom span the whole system band so a click on the tab stave
+    // still lands in the right measure.
+    const layout = { pageWidth, measures: [] }
     rows.forEach((row, rowIndex) => {
       const y = PAGE_MARGIN + rowIndex * rowHeight
-      row.forEach((plan) => drawMeasure(context, plan, y, score, { showNotation, showTab }))
+      row.forEach((plan) => {
+        const drawn = drawMeasure(context, plan, y, score, { showNotation, showTab })
+        layout.measures.push({
+          measureIndex: plan.measureIndex,
+          x: plan.x,
+          width: plan.width,
+          hitTop: y,
+          hitBottom: y + rowHeight,
+          topLineY: drawn.topLineY,
+          lineSpacing: drawn.lineSpacing,
+          notes: drawn.notes
+        })
+      })
     })
+    return layout
   }
 
   return { renderScore }
