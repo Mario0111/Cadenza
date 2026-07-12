@@ -4,14 +4,16 @@
 // which staves are drawn, never the data (displayMode is a score field, so
 // the store action behind this marks the score unsaved like any other edit).
 defineProps({
-  modelValue: { type: String, required: true } // 'notation' | 'tab' | 'both'
+  modelValue: { type: String, required: true } // 'notation' | 'both'
 })
 
 defineEmits(['update:modelValue'])
 
+// Two modes only: notation alone, or notation with tabs underneath. A
+// tab-only view existed once and was cut (Mario, Phase 9 review) — the
+// notation stave is the manuscript's anchor and always shows.
 const MODES = [
   { value: 'notation', label: 'Notation' },
-  { value: 'tab', label: 'Tab' },
   { value: 'both', label: 'Both' }
 ]
 </script>

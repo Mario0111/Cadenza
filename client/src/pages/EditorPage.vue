@@ -270,6 +270,7 @@ function onKeydown(event) {
               interactive
               @select="({ measureIndex, noteIndex }) => store.selectNote(measureIndex, noteIndex)"
               @add-note="store.addNote"
+              @add-tab-note="store.addTabNote"
               @background-click="store.clearSelection"
             />
           </div>
@@ -288,11 +289,12 @@ function onKeydown(event) {
       <QuietMark v-if="fullnessSummary" :message="fullnessSummary" />
 
       <p class="editor__hint">
-        Drag a figure from the toolbar onto a line or space to write a note;
-        click a note to pick it up again. With the manuscript focused: arrows
-        move and transpose, a–g re-letter, 1–6 set the duration, period dots
-        it, r writes rests, n adds the next note, Delete removes, Escape puts
-        the pen down. Ctrl+S saves.
+        Drag a figure from the toolbar onto a line or space to write a note —
+        or onto a tab string line to write a tab-only note (it lives on the tab
+        stave alone; set its fret in the panel). Click a note to pick it up
+        again. With the manuscript focused: arrows move and transpose, a–g
+        re-letter, 1–6 set the duration, period dots it, r writes rests, n adds
+        the next note, Delete removes, Escape puts the pen down. Ctrl+S saves.
       </p>
     </template>
   </section>

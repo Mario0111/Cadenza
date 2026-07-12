@@ -10,7 +10,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useScoreRenderer } from '@/composables/useScoreRenderer'
 import { measureFullness } from '@/lib/scoreModel'
 import { FIGURE_DRAG_TYPE } from '@/lib/durations'
-import { pitchAt, findMeasureAt, findNoteAt, insertIndexForX } from '@/lib/staffGeometry'
+import { pitchAt, stringAt, yForPitch, findMeasureAt, findNoteAt, insertIndexForX } from '@/lib/staffGeometry'
 
 const props = defineProps({
   // The score model to render (source of truth).
@@ -26,7 +26,7 @@ const props = defineProps({
   showMarks: { type: Boolean, default: true }
 })
 
-const emit = defineEmits(['select', 'add-note', 'background-click'])
+const emit = defineEmits(['select', 'add-note', 'add-tab-note', 'background-click'])
 
 const host = ref(null)
 const { renderScore } = useScoreRenderer()
@@ -45,20 +45,40 @@ const quietMarks = ref([])
  * 'over' get a mark: an EMPTY measure is plainly intentional (you just haven't
  * written there yet), so marking it would be noise, not observation. The mark
  * never blocks or corrects — it only points, in words, at what it noticed.
+ *
+ * The mark observes the NOTATION stave (tab-only notes don't enter its
+ * arithmetic — see measureTicks), so it pins itself to that stave: centred
+ * over the measure, just above the top line. No notation stave drawn means
+ * nothing to point at, and no mark.
  */
 function buildQuietMarks() {
   if (!layout || !props.showMarks) return []
   const timeSignature = props.score.timeSignature
   const marks = []
   for (const drawn of layout.measures) {
+    if (drawn.topLineY == null) continue
     const measure = props.score.measures[drawn.measureIndex]
     const { state } = measureFullness(measure, timeSignature)
     if (state !== 'partial' && state !== 'over') continue
+
+    // The mark hangs slightly above whatever the measure actually holds: its
+    // anchor is the top staff line, pushed up by any notehead that climbs
+    // into the ledger territory — the mark observes, it never sits on a note.
+    let anchorY = drawn.topLineY
+    for (const note of measure.notes || []) {
+      if (note.isRest || !note.pitches?.length) continue
+      for (const pitch of note.pitches) {
+        const y = yForPitch(pitch, drawn)
+        if (y != null && y < anchorY) anchorY = y
+      }
+    }
+
     marks.push({
       measureIndex: drawn.measureIndex,
-      // Tucked into the measure's top-right corner, above the staff lines.
-      left: drawn.x + drawn.width - 20,
-      top: drawn.hitTop + 2,
+      // Centred on the measure (the icon is 13px wide); 24px above the anchor
+      // clears the notehead (half a head plus a small breath of air).
+      left: drawn.x + drawn.width / 2 - 7,
+      top: anchorY - 24,
       message:
         state === 'partial'
           ? `Measure ${drawn.measureIndex + 1} is a little short of ${timeSignature} — no rush, fix it whenever.`
@@ -131,10 +151,12 @@ function onDragOver(event) {
 }
 
 /**
- * A dropped figure, mapped against the layout report: inside a measure's
- * writable band → 'add-note' with the figure's duration, at the snapped pitch
- * and x-position. Anywhere else (the tab stave, the margins) the drop quietly
- * does nothing — no note appears where none was aimed.
+ * A dropped figure, mapped against the layout report:
+ *   in the notation staff's writable band → 'add-note' at the snapped pitch
+ *   on a tab string line                  → 'add-tab-note' on that string
+ * Both carry the figure's duration and x-position. Anywhere else (the margins,
+ * the gap between staves) the drop quietly does nothing — no note appears
+ * where none was aimed.
  */
 function onDrop(event) {
   if (!props.interactive || !layout) return
@@ -146,15 +168,18 @@ function onDrop(event) {
   if (!point) return
   const measure = findMeasureAt(layout, point.x, point.y)
   if (!measure) return
+  const insertIndex = insertIndexForX(measure, point.x)
 
   const pitch = pitchAt(point.y, measure)
-  if (!pitch) return
-  emit('add-note', {
-    measureIndex: measure.measureIndex,
-    insertIndex: insertIndexForX(measure, point.x),
-    pitch,
-    duration
-  })
+  if (pitch) {
+    emit('add-note', { measureIndex: measure.measureIndex, insertIndex, pitch, duration })
+    return
+  }
+
+  const string = stringAt(point.y, measure)
+  if (string) {
+    emit('add-tab-note', { measureIndex: measure.measureIndex, insertIndex, string, duration })
+  }
 }
 </script>
 

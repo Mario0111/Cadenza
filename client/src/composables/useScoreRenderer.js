@@ -23,6 +23,7 @@ import {
   TabStave,
   StaveNote,
   TabNote,
+  GhostNote,
   Voice,
   Formatter,
   Dot,
@@ -33,7 +34,7 @@ import {
 } from 'vexflow'
 
 import { toVexflowDuration } from '@/lib/durations'
-import { noteHasTab } from '@/lib/scoreModel'
+import { noteHasTab, isTabOnly } from '@/lib/scoreModel'
 
 /* ---- Layout constants (all in px on VexFlow's canvas) ---------------------
  * These shape the "tidy paper" look: measures grow with their contents but
@@ -65,10 +66,16 @@ const STAFF_HEADROOM = 30
  * Height of one system (row of measures), which depends on what's stacked in it.
  * "both" carries a notation stave and a tab stave; the single modes carry one.
  * Rows with a notation stave include its ledger headroom.
+ *
+ * Notation-only rows sit as tight as the tab rows (Mario's call — anything
+ * more read as too airy). That spends the whole safety margin: an extreme low
+ * note (or one wearing a right-hand annotation) will reach into the next
+ * system's ledger territory, colliding only if that system climbs high at the
+ * same spot. A deliberate trade of margin for a page that reads like a page.
  */
 function systemHeight(showNotation, showTab) {
   if (showNotation && showTab) return 264
-  if (showNotation) return 190
+  if (showNotation) return 130
   return 130
 }
 
@@ -128,14 +135,15 @@ function toStaveNote(note) {
 
 /**
  * One note event → a VexFlow TabNote, or null if it carries no tab data.
- * Tabs are manual: only the pitches with BOTH a string and a fret appear, and a
+ * Tabs are manual: only the entries with BOTH a string and a fret appear, and a
  * note with none is simply omitted from the tab stave (never auto-derived).
+ * Built from strings[] (not pitches[]) so a tab-only note — which has no
+ * pitches at all — still gets its digit.
  */
 function toTabNote(note) {
   if (!noteHasTab(note)) return null
   const positions = []
-  note.pitches.forEach((_pitch, i) => {
-    const str = note.strings?.[i]
+  ;(note.strings || []).forEach((str, i) => {
     const fret = note.frets?.[i]
     if (str != null && fret != null) positions.push({ str, fret })
   })
@@ -147,6 +155,20 @@ function toTabNote(note) {
   })
   if (note.dotted) Dot.buildAndAttach([tabNote], { all: true })
   return tabNote
+}
+
+/**
+ * An invisible tickable holding one event's time on a stave where it has
+ * nothing to draw. Both staves' voices must run on the same clock for an
+ * event's notehead and tab digit to land in the same column — a skipped event
+ * would shift everything after it, so its time is held instead.
+ */
+function makeGhost(note) {
+  const ghost = new GhostNote({ duration: toVexflowDuration(note.duration, false) })
+  // Same dot handling as the visible notes, so the tick math stays identical
+  // across voices (the ghost never draws, dot included).
+  if (note.dotted) Dot.buildAndAttach([ghost], { all: true })
+  return ghost
 }
 
 /**
@@ -182,40 +204,71 @@ function measureWidth(minContent, { isLineStart, isFirstOverall }) {
 function planMeasures(score, { showNotation, showTab, selection, selectionInk }) {
   return (score.measures || []).map((measure, measureIndex) => {
     const notes = measure.notes || []
-    const staveNotes = showNotation ? notes.map(toStaveNote) : []
 
-    // Only notes with tab data reach the tab stave. Each entry keeps its source
-    // noteIndex so a click on a tab digit can find the model note behind it.
+    // Each stave's voice covers EVERY event: drawable ones as real notes,
+    // the rest as invisible ghosts holding their time (a tab-only note on the
+    // notation stave; a tab-less note or a rest on the tab stave). The voices
+    // therefore share one clock, and the formatter puts an event's notehead
+    // and tab digit in the same column. The entries lists keep only the drawn
+    // notes, with their source noteIndex, for selection and hit reporting.
+    const staveEntries = []
+    const staveNotes = []
+    if (showNotation) {
+      notes.forEach((note, noteIndex) => {
+        if (isTabOnly(note)) {
+          staveNotes.push(makeGhost(note))
+          return
+        }
+        const staveNote = toStaveNote(note)
+        staveEntries.push({ staveNote, noteIndex })
+        staveNotes.push(staveNote)
+      })
+    }
+
     const tabEntries = []
+    const tabNotes = []
     if (showTab) {
       notes.forEach((note, noteIndex) => {
         const tabNote = toTabNote(note)
-        if (tabNote) tabEntries.push({ tabNote, noteIndex })
+        if (!tabNote) {
+          tabNotes.push(makeGhost(note))
+          return
+        }
+        tabEntries.push({ tabNote, noteIndex })
+        tabNotes.push(tabNote)
       })
     }
-    const tabNotes = tabEntries.map((entry) => entry.tabNote)
 
     // The selected note wears brass on every stave it appears on.
     const isSelectedMeasure =
       selectionInk && selection && selection.measureIndex === measureIndex
     if (isSelectedMeasure && selection.noteIndex != null) {
       const brass = { fillStyle: selectionInk, strokeStyle: selectionInk }
-      const selectedStaveNote = staveNotes[selection.noteIndex]
-      if (selectedStaveNote) selectedStaveNote.setStyle(brass)
+      const selectedStaveEntry = staveEntries.find((entry) => entry.noteIndex === selection.noteIndex)
+      if (selectedStaveEntry) selectedStaveEntry.staveNote.setStyle(brass)
       const selectedTabEntry = tabEntries.find((entry) => entry.noteIndex === selection.noteIndex)
       if (selectedTabEntry) selectedTabEntry.tabNote.setStyle(brass)
     }
 
     // Measure the content with throwaway voices so we can size the measure.
+    // A voice with nothing visible on its stave (all ghosts) is left out
+    // entirely — same rule as when drawing.
     const measuringVoices = []
-    if (staveNotes.length) {
+    if (staveEntries.length) {
       measuringVoices.push(makeSoftVoice(score.timeSignature).addTickables(staveNotes))
     }
-    if (tabNotes.length) {
+    if (tabEntries.length) {
       measuringVoices.push(makeSoftVoice(score.timeSignature).addTickables(tabNotes))
     }
 
-    return { measureIndex, staveNotes, tabNotes, tabEntries, minContent: contentMinWidth(measuringVoices) }
+    return {
+      measureIndex,
+      staveEntries,
+      staveNotes,
+      tabEntries,
+      tabNotes,
+      minContent: contentMinWidth(measuringVoices)
+    }
   })
 }
 
@@ -323,28 +376,45 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
       .draw()
   }
 
+  // A note's drawn x is its column PLUS its own stave's note-start x — and the
+  // two staves' starts differ (treble clef and time signature take more room
+  // than the TAB badge). Give both staves the later start, or every tab digit
+  // sits left of its notehead by exactly that difference.
+  if (notationStave && tabStave) {
+    const sharedStart = Math.max(notationStave.getNoteStartX(), tabStave.getNoteStartX())
+    notationStave.setNoteStartX(sharedStart)
+    tabStave.setNoteStartX(sharedStart)
+  }
+
   // The measure's layout report. Line spacing on a VexFlow stave is 10px, and
-  // the top line's y comes off the drawn stave itself.
+  // the top line's y comes off the drawn stave itself. The tab stave's line
+  // geometry rides along too: its six lines ARE the strings, so a drop can be
+  // snapped to one (see stringAt in staffGeometry.js).
   const layout = {
     topLineY: notationStave ? notationStave.getYForLine(0) : null,
     lineSpacing: notationStave ? notationStave.getSpacingBetweenLines() : 0,
+    tabTopLineY: tabStave ? tabStave.getYForLine(0) : null,
+    tabLineSpacing: tabStave ? tabStave.getSpacingBetweenLines() : 0,
     notes: []
   }
 
   // Build the real voices to draw. An empty measure has no voices — it stays an
-  // empty stave, exactly as written (no auto-fill).
+  // empty stave, exactly as written (no auto-fill) — and a stave with nothing
+  // visible on it (only ghosts) is skipped the same way.
   const voices = []
-  if (notationStave && plan.staveNotes.length) {
+  if (notationStave && plan.staveEntries.length) {
     voices.push({ voice: makeSoftVoice(score.timeSignature).addTickables(plan.staveNotes), stave: notationStave })
   }
-  if (tabStave && plan.tabNotes.length) {
+  if (tabStave && plan.tabEntries.length) {
     voices.push({ voice: makeSoftVoice(score.timeSignature).addTickables(plan.tabNotes), stave: tabStave })
   }
   if (!voices.length) return layout
 
   // Format all of a measure's voices to the same note area so the tab frets sit
-  // under their notes. Formatting is joined per-voice (not as one aligned group)
-  // so a note missing from the tab stave doesn't distort the notation spacing.
+  // under their notes. Because ghosts keep both voices on one clock (see
+  // planMeasures), the formatter lands every event's notehead and tab digit in
+  // the same column — a note absent from one stave leaves a gap there instead
+  // of letting the columns drift apart.
   const reference = notationStave || tabStave
   // Format into the note area MINUS a trailing gap, so the last note doesn't sit
   // flush against the closing barline. Applies to both staves (they share this
@@ -357,20 +427,20 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
 
   voices.forEach(({ voice, stave }) => voice.draw(context, stave))
 
-  // Note positions are only known after drawing. Prefer the notation stave
-  // (every note event is on it); in tab-only mode fall back to the tab entries,
-  // where a note without tab data simply has no clickable spot.
-  if (plan.staveNotes.length) {
-    layout.notes = plan.staveNotes.map((staveNote, noteIndex) => ({
-      noteIndex,
-      x: staveNote.getAbsoluteX()
-    }))
-  } else {
-    layout.notes = plan.tabEntries.map(({ tabNote, noteIndex }) => ({
-      noteIndex,
-      x: tabNote.getAbsoluteX()
-    }))
-  }
+  // Note positions are only known after drawing. Each note's x comes from
+  // whichever stave drew it, preferring the notation stave when it is on both
+  // (writing the stave entries second lets them overwrite the tab x). A note
+  // on neither visible stave simply has no clickable spot.
+  const xByNoteIndex = new Map()
+  plan.tabEntries.forEach(({ tabNote, noteIndex }) => {
+    xByNoteIndex.set(noteIndex, tabNote.getAbsoluteX())
+  })
+  plan.staveEntries.forEach(({ staveNote, noteIndex }) => {
+    xByNoteIndex.set(noteIndex, staveNote.getAbsoluteX())
+  })
+  layout.notes = [...xByNoteIndex.entries()]
+    .map(([noteIndex, x]) => ({ noteIndex, x }))
+    .sort((a, b) => a.noteIndex - b.noteIndex)
   return layout
 }
 
@@ -426,7 +496,8 @@ function resolveToken(styles, ...names) {
  *   options.selection — { measureIndex, noteIndex } to draw in brass, or null
  *
  * Returns the layout report: { pageWidth, measures: [{ measureIndex, x, width,
- * hitTop, hitBottom, topLineY, lineSpacing, notes: [{ noteIndex, x }] }] }.
+ * hitTop, hitBottom, topLineY, lineSpacing, tabTopLineY, tabLineSpacing,
+ * notes: [{ noteIndex, x }] }] }.
  */
 export function useScoreRenderer() {
   function renderScore(container, score, options = {}) {
@@ -493,6 +564,8 @@ export function useScoreRenderer() {
           hitBottom: y + rowHeight,
           topLineY: drawn.topLineY,
           lineSpacing: drawn.lineSpacing,
+          tabTopLineY: drawn.tabTopLineY,
+          tabLineSpacing: drawn.tabLineSpacing,
           notes: drawn.notes
         })
       })

@@ -6,6 +6,12 @@
 // Everything here is optional and manual, per the core philosophy: string and
 // fret are per-pitch, nullable fields the user types in — never derived from
 // the pitch. A pitch without both simply does not appear on the tab stave.
+// A TAB-ONLY note (no pitches at all) gets one row of its own: its string and
+// fret aren't optional extras but the note itself, so they can't be cleared —
+// only edited, or removed along with the note.
+import { computed } from 'vue'
+import { isTabOnly } from '@/lib/scoreModel'
+
 const props = defineProps({
   // The selected note event, or null when nothing is selected.
   note: { type: Object, default: null }
@@ -28,6 +34,23 @@ function pitchLabel(pitch) {
   const [letter, octave] = String(pitch).split('/')
   return `${letter.toUpperCase()}${octave}`
 }
+
+const tabOnly = computed(() => isTabOnly(props.note))
+
+// The rows to edit: one per pitch (chords get several), or — for a tab-only
+// note — the single string/fret slot the note consists of. `index` is what the
+// store's per-pitch actions expect either way.
+const rows = computed(() => {
+  if (!props.note || props.note.isRest) return []
+  if (tabOnly.value) {
+    return [{ key: 'tab-only', label: 'Tab', index: 0 }]
+  }
+  return props.note.pitches.map((pitch, index) => ({
+    key: `${index}-${pitch}`,
+    label: pitchLabel(pitch),
+    index
+  }))
+})
 
 // A <select> hands us strings; the model wants an integer or null (the empty
 // "none" option). Same parse for both the string select and the fret input.
@@ -70,24 +93,24 @@ function onRightFinger(finger) {
     </p>
 
     <template v-else>
-      <!-- One row per pitch: chords get a row for each of their notes. -->
+      <!-- One row per pitch (chords get several); a tab-only note gets its
+           single string/fret row instead. -->
       <div class="fingering__section">
-        <p class="fingering__label">Where it sits on the neck — optional</p>
-        <div
-          v-for="(pitch, pitchIndex) in note.pitches"
-          :key="`${pitchIndex}-${pitch}`"
-          class="fingering__row"
-        >
-          <span class="fingering__pitch">{{ pitchLabel(pitch) }}</span>
+        <p class="fingering__label">
+          {{ tabOnly ? 'Where it sits on the neck' : 'Where it sits on the neck — optional' }}
+        </p>
+        <div v-for="row in rows" :key="row.key" class="fingering__row">
+          <span class="fingering__pitch">{{ row.label }}</span>
 
           <label class="fingering__field">
             <span class="fingering__field-name">String</span>
             <select
               class="fingering__select"
-              :value="note.strings?.[pitchIndex] ?? ''"
-              @change="onStringChange(pitchIndex, $event)"
+              :value="note.strings?.[row.index] ?? ''"
+              @change="onStringChange(row.index, $event)"
             >
-              <option value="">none</option>
+              <!-- A tab-only note IS its string — there is no "none" for it. -->
+              <option v-if="!tabOnly" value="">none</option>
               <option v-for="string in STRINGS" :key="string" :value="string">
                 {{ string }}
               </option>
@@ -102,17 +125,23 @@ function onRightFinger(finger) {
               min="0"
               max="24"
               placeholder="—"
-              :value="note.frets?.[pitchIndex] ?? ''"
-              @change="onFretChange(pitchIndex, $event)"
+              :value="note.frets?.[row.index] ?? ''"
+              @change="onFretChange(row.index, $event)"
             />
           </label>
         </div>
         <p class="fingering__hint">
-          A pitch joins the tab stave once it has both a string and a fret.
+          {{
+            tabOnly
+              ? 'This note lives on the tab stave only — 0 is the open string. To take it off the page, delete the note.'
+              : 'A pitch joins the tab stave once it has both a string and a fret.'
+          }}
         </p>
       </div>
 
-      <div class="fingering__section" role="group" aria-label="Left-hand finger">
+      <!-- Fingering draws around the notation notehead, which a tab-only note
+           doesn't have — so these controls step aside for it. -->
+      <div v-if="!tabOnly" class="fingering__section" role="group" aria-label="Left-hand finger">
         <p class="fingering__label">Left hand</p>
         <div class="fingering__choices">
           <button
@@ -130,7 +159,7 @@ function onRightFinger(finger) {
         </div>
       </div>
 
-      <div class="fingering__section" role="group" aria-label="Right-hand finger">
+      <div v-if="!tabOnly" class="fingering__section" role="group" aria-label="Right-hand finger">
         <p class="fingering__label">Right hand</p>
         <div class="fingering__choices">
           <button

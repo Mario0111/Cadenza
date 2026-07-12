@@ -15,10 +15,12 @@ const scoreSchema = new mongoose.Schema(
     timeSignature: { type: String, default: '4/4' },
     keySignature: { type: String, default: 'C' },
 
-    // Which staves to show. The same measures render in any of these modes.
+    // Which staves to show. The same measures render in either mode. ('tab'
+    // existed once and was cut; old documents carrying it still load fine —
+    // the enum only guards new writes, and the client opens them as 'both'.)
     displayMode: {
       type: String,
-      enum: ['notation', 'tab', 'both'],
+      enum: ['notation', 'both'],
       default: 'both'
     },
 

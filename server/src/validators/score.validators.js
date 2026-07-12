@@ -18,8 +18,8 @@ const optionalScoreFields = [
     .withMessage('A key signature has to be text, like "C".'),
   body('displayMode')
     .optional()
-    .isIn(['notation', 'tab', 'both'])
-    .withMessage('Display mode must be notation, tab, or both.'),
+    .isIn(['notation', 'both'])
+    .withMessage('Display mode must be notation or both.'),
   // We check that measures is an array, but never look inside it: incomplete or
   // overfull measures are allowed by design, so there is no rhythmic validation.
   body('measures')

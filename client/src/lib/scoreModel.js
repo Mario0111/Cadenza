@@ -59,6 +59,17 @@ export function defaultNextNote(prevNote = null) {
   return createNote({ duration: prevNote.duration, dotted: prevNote.dotted })
 }
 
+/**
+ * True for a TAB-ONLY note: no pitches written, not a rest. Such a note lives
+ * on the tab stave alone — the mirror of a pitched note without tab data,
+ * which lives on the notation stave alone. Which staves show an event is
+ * always derived from what data it carries; nothing is ever converted.
+ */
+export function isTabOnly(note) {
+  if (!note || note.isRest) return false
+  return !note.pitches || note.pitches.length === 0
+}
+
 /** True when a note carries any tab data — at least one string+fret pair set. */
 export function noteHasTab(note) {
   if (!note || note.isRest) return false
@@ -67,10 +78,20 @@ export function noteHasTab(note) {
   return strings.some((str, i) => str != null && frets[i] != null)
 }
 
-/** Total ticks currently used by a measure (sum of its notes, rests included). */
+/**
+ * Total ticks currently used by a measure's NOTATION content (pitched notes
+ * and rests). Tab-only notes are left out on purpose: the quiet mark observes
+ * the notation stave's rhythm against the time signature, and a note that
+ * lives on the tab stave alone is outside that arithmetic — a measure holding
+ * nothing but tab reads as empty here, and empty is never marked.
+ */
 export function measureTicks(measure) {
   const notes = measure?.notes || []
-  return notes.reduce((sum, note) => sum + durationToTicks(note.duration, note.dotted), 0)
+  return notes.reduce(
+    (sum, note) =>
+      isTabOnly(note) ? sum : sum + durationToTicks(note.duration, note.dotted),
+    0
+  )
 }
 
 /**

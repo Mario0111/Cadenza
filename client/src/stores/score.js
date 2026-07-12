@@ -14,7 +14,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { createScore, createMeasure, defaultNextNote } from '@/lib/scoreModel'
+import { createScore, createMeasure, defaultNextNote, isTabOnly } from '@/lib/scoreModel'
 import { shiftPitch, setPitchLetter } from '@/lib/pitches'
 import * as scoresApi from '@/api/scores'
 
@@ -103,7 +103,9 @@ export const useScoreStore = defineStore('score', () => {
         description: loaded.description,
         timeSignature: loaded.timeSignature,
         keySignature: loaded.keySignature,
-        displayMode: loaded.displayMode,
+        // The tab-only display mode was cut; a score saved back when it
+        // existed quietly opens as "both" (its data is untouched).
+        displayMode: loaded.displayMode === 'tab' ? 'both' : loaded.displayMode,
         measures: loaded.measures?.length ? loaded.measures : [createMeasure()]
       })
       scoreId.value = loaded.id
@@ -224,6 +226,29 @@ export const useScoreStore = defineStore('score', () => {
   }
 
   /**
+   * Write one TAB-ONLY note — the payload the canvas emits for a figure
+   * dropped on a tab string line. Pitches stay empty, so the note lives on the
+   * tab stave alone (the mirror of a pitched note without tab data). The fret
+   * starts at 0, the open string: the note is real and visible immediately,
+   * and lands selected so the fret can be typed right away. Nothing is derived
+   * from anything, and the rest pen is ignored — a drop on a string writes on
+   * that string.
+   */
+  function addTabNote({ measureIndex, insertIndex, string, duration }) {
+    const measure = score.value.measures[measureIndex]
+    if (!measure) return
+    if (duration) pen.value.duration = duration
+    const note = defaultNextNote(pen.value)
+    note.isRest = false
+    note.pitches = []
+    note.strings = [string]
+    note.frets = [0]
+    measure.notes.splice(insertIndex, 0, note)
+    selectNote(measureIndex, insertIndex)
+    markDirty()
+  }
+
+  /**
    * The keyboard way to write: append after the selected note (or at the end
    * of the selected measure, or of the last measure). The new note starts on
    * the previous note's pitch — your hand stays where it was, arrows move it.
@@ -282,10 +307,24 @@ export const useScoreStore = defineStore('score', () => {
     }
   }
 
-  /** Move the selected note by `delta` staff positions (±7 = an octave). */
+  /**
+   * Move the selected note by `delta` staff positions (±7 = an octave). For a
+   * tab-only note "up" and "down" mean the neighbouring string instead — one
+   * string per press, whatever the delta, since strings have no octaves. The
+   * fret stays put: moving strings changes where the hand sits, nothing more.
+   */
   function transposeSelected(delta) {
     const note = selectedNote.value
     if (!note || note.isRest) return
+    if (isTabOnly(note)) {
+      // Visually up = toward the top line, which is string 1 (high e).
+      const current = note.strings[0] ?? 1
+      const next = Math.min(6, Math.max(1, current + (delta > 0 ? -1 : 1)))
+      if (next === current) return
+      note.strings[0] = next
+      markDirty()
+      return
+    }
     // A chord transposes as a block, keeping its shape.
     note.pitches = note.pitches.map((pitch) => shiftPitch(pitch, delta))
     markDirty()
@@ -327,30 +366,41 @@ export const useScoreStore = defineStore('score', () => {
   // Keep strings[]/frets[] the same length as pitches[], padding with null.
   // Loaded data may predate an edit that changed the pitch count; aligning
   // here means the per-pitch indexes below always land where they should.
+  // A tab-only note has no pitches but still owns one string/fret slot.
   function alignTabArrays(note) {
-    const count = note.pitches.length
+    const count = note.pitches.length || 1
     note.strings = Array.from({ length: count }, (_, i) => note.strings?.[i] ?? null)
     note.frets = Array.from({ length: count }, (_, i) => note.frets?.[i] ?? null)
   }
 
-  /** Set (or clear, with null) the string for one pitch of the selected note. */
+  /**
+   * Set (or clear, with null) the string for one pitch of the selected note.
+   * A tab-only note can't be cleared to null: without its string it would
+   * vanish from every stave while still counting ticks — deleting the note is
+   * the honest way to remove it.
+   */
   function setSelectedString(pitchIndex, string) {
     const note = selectedNote.value
     if (!note || note.isRest) return
+    if (string == null && isTabOnly(note)) return
     if (string != null && !(Number.isInteger(string) && string >= 1 && string <= 6)) return
     alignTabArrays(note)
-    if (pitchIndex < 0 || pitchIndex >= note.pitches.length) return
+    if (pitchIndex < 0 || pitchIndex >= note.strings.length) return
     note.strings[pitchIndex] = string
     markDirty()
   }
 
-  /** Set (or clear, with null) the fret for one pitch of the selected note. */
+  /**
+   * Set (or clear, with null) the fret for one pitch of the selected note.
+   * Same rule as the string: a tab-only note keeps a fret or gets deleted.
+   */
   function setSelectedFret(pitchIndex, fret) {
     const note = selectedNote.value
     if (!note || note.isRest) return
+    if (fret == null && isTabOnly(note)) return
     if (fret != null && !(Number.isInteger(fret) && fret >= 0 && fret <= 24)) return
     alignTabArrays(note)
-    if (pitchIndex < 0 || pitchIndex >= note.pitches.length) return
+    if (pitchIndex < 0 || pitchIndex >= note.frets.length) return
     note.frets[pitchIndex] = fret
     markDirty()
   }
@@ -448,6 +498,7 @@ export const useScoreStore = defineStore('score', () => {
     selectNote,
     clearSelection,
     addNote,
+    addTabNote,
     addNoteAfterSelection,
     setDuration,
     toggleDot,

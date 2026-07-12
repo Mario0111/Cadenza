@@ -112,7 +112,7 @@ The app should feel like **writing on paper, with quality of life** — not like
 ## Data model (source of truth)
 
 Score: `title`, `description`, `timeSignature`, `keySignature`,
-`displayMode` (`notation` | `tab` | `both`), `owner` (ref User), timestamps,
+`displayMode` (`notation` | `both`), `owner` (ref User), timestamps,
 `measures[]`. Measure: `notes[]` (note events). Note event:
 
 ```js

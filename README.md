@@ -109,7 +109,7 @@ Two collections: **users** and **scores**.
 | `description`   | Optional free text                                       |
 | `timeSignature` | e.g. `"4/4"` — used for measure capacity and quiet marks |
 | `keySignature`  | e.g. `"C"`                                               |
-| `displayMode`   | `notation`, `tab`, or `both` — which staves to show      |
+| `displayMode`   | `notation` or `both` — which staves to show              |
 | `owner`         | Reference to the user who owns it; every query is scoped by this |
 | `measures[]`    | The music itself, stored as free-form JSON (see below)   |
 | timestamps      | `createdAt`, `updatedAt` (automatic)                     |

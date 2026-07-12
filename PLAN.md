@@ -210,3 +210,47 @@ Split into sub-phases; each is its own review gate.
       deletes never re-flow, tabs/fingering all manual and nullable, quiet
       marks are the only rhythm feedback and stay off the print sheet)
 - 🛑 **Stop, summarize — project complete.**
+
+---
+
+## Phase 9 — tab-only notes (post-review addition, Mario's call 2026-07-11)
+Problem: tabs could only be written as annotations on notation notes, and in
+tab-only display mode nothing could be written at all. Solution: the symmetric
+rule — an event with an empty `pitches[]` (and not a rest) is a *tab-only
+note*: it has duration, string and fret, appears on the tab stave, and simply
+does not appear on the notation stave (the mirror of "no tab data → absent
+from the tab stave"). Nothing is ever derived in either direction.
+- [x] `isTabOnly(note)` helper in `lib/scoreModel.js`
+- [x] Renderer: notation voice skips tab-only events (mirror of the tab
+      voice's existing filter); tab notes built from `strings[]` so they no
+      longer need pitches; layout report gains the tab stave's line geometry
+      and per-note x from whichever stave drew the note
+- [x] `stringAt(y, measureLayout)` in `lib/staffGeometry.js` — snap a drop to
+      the nearest of the six string lines (string 1 = top line)
+- [x] Dropping a figure on the tab stave writes a tab-only note (string from
+      the drop, fret 0 = open string, selected for immediate fret editing)
+- [x] Store: `addTabNote` action; arrows move a tab-only note across strings;
+      string/fret edits work without pitches (and can't be cleared to null —
+      a tab note without them would be invisible; deleting is how it goes)
+- [x] FingeringControls: a tab-only note gets its string/fret row (no pitch
+      rows to piggyback on) with quiet copy explaining what it is
+- [x] Review round 1 (Mario): the quiet mark is a NOTATION observation — tab-only
+      notes no longer enter its arithmetic (a tabs-only measure reads as empty,
+      and empty is never marked), and in tab display mode, where the notation
+      stave isn't on the page, marks and summary stay away entirely
+- [x] Review round 2 (Mario): notation-only systems tightened to the tab rows'
+      130px; the quiet mark now sits centred over its measure just above the
+      top staff line (was tucked far up in the corner); the tab-only DISPLAY
+      MODE cut entirely — ModeSwitcher offers notation/both, the server enum
+      and validator match, and a legacy 'tab' score quietly opens as 'both'
+- [x] Review round 3 (Mario): tab digits now share a column with their
+      noteheads. Two causes fixed in the renderer: each stave's voice now
+      covers EVERY event (invisible GhostNotes hold the time of events with
+      nothing to draw on that stave, so the voices run on one clock), and
+      both staves adopt the same note-start x (the treble clef + time
+      signature begin notes further right than the TAB badge)
+- [~] Manual test: exercised end to end in the browser against the real API
+      (drop on strings in both/tab modes, fret + string edits, arrows, mode
+      switches, quiet mark, save/reload round-trip, print sheet, digit-click
+      selection — no console errors); Mario's hands-on run pending
+- 🛑 **Stop, summarize, wait for Mario to try the feel.**

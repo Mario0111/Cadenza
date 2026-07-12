@@ -49,6 +49,35 @@ export function pitchAt(y, measureLayout) {
   return stepToPitch(clampStep(TOP_LINE_STEP - stepsBelowTopLine))
 }
 
+/**
+ * The inverse of pitchAt: the y of a pitch's notehead centre on this measure's
+ * staff, or null when there is no notation stave to measure against. pitchAt
+ * rounds a y to the nearest step; this maps a step back to its exact y.
+ */
+export function yForPitch(pitch, measureLayout) {
+  const { topLineY, lineSpacing } = measureLayout
+  if (topLineY == null || !lineSpacing) return null
+  const stepsBelowTopLine = TOP_LINE_STEP - pitchToStep(pitch)
+  return topLineY + stepsBelowTopLine * (lineSpacing / 2)
+}
+
+/**
+ * Snap a drop height to a guitar string, or null when the point is not on the
+ * tab stave (or there is no tab stave to measure against). The tab stave's six
+ * lines ARE the strings — the top line is string 1 (high e), numbering down to
+ * string 6 (low E). Unlike the notation staff there are no spaces between and
+ * no ledger territory beyond: a drop more than half a line spacing outside the
+ * six lines means something else, so it snaps to nothing.
+ */
+export function stringAt(y, measureLayout) {
+  const { tabTopLineY, tabLineSpacing } = measureLayout
+  if (tabTopLineY == null || !tabLineSpacing) return null
+
+  const lineIndex = Math.round((y - tabTopLineY) / tabLineSpacing)
+  if (lineIndex < 0 || lineIndex > 5) return null
+  return lineIndex + 1 // lines count from 0 at the top; strings from 1
+}
+
 /** The measure whose box (x span + system band) contains the point, or null. */
 export function findMeasureAt(layout, x, y) {
   const measures = layout?.measures || []
