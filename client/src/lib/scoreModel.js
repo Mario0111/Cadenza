@@ -22,6 +22,8 @@ export function createNote(overrides = {}) {
     duration: 'q',
     dotted: false,
     isRest: false,
+    beamed: false, // set BY HAND; adjacent flagged eighths-or-shorter share a beam
+    slurred: false, // set BY HAND; adjacent flagged notes share one slur
     strings: [null], // per-pitch, nullable — tabs are entered by hand
     frets: [null],
     leftFinger: null, // 1..4 | null
@@ -68,6 +70,31 @@ export function defaultNextNote(prevNote = null) {
 export function isTabOnly(note) {
   if (!note || note.isRest) return false
   return !note.pitches || note.pitches.length === 0
+}
+
+// The durations short enough to carry a flag — and therefore a beam.
+const BEAMABLE_DURATIONS = ['8', '16', '32']
+
+/**
+ * True when a note can sit under a beam: an eighth or shorter, with a stem on
+ * the notation stave (a beam is a notation mark — rests have no stem, and a
+ * tab-only note never appears there). The `beamed` flag itself is manual;
+ * this only says whether the flag can mean anything.
+ */
+export function isBeamable(note) {
+  if (!note || note.isRest || isTabOnly(note)) return false
+  return BEAMABLE_DURATIONS.includes(note.duration)
+}
+
+/**
+ * True when a note can sit under a slur: any pitched note with a notehead on
+ * the notation stave (not a rest, not tab-only). Unlike a beam, a slur has no
+ * duration limit — it arcs over a phrase of notes of any length. The `slurred`
+ * flag is manual; this only says whether the flag can mean anything.
+ */
+export function isSlurrable(note) {
+  if (!note || note.isRest || isTabOnly(note)) return false
+  return true
 }
 
 /** True when a note carries any tab data — at least one string+fret pair set. */

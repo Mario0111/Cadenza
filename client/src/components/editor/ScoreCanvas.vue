@@ -10,7 +10,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useScoreRenderer } from '@/composables/useScoreRenderer'
 import { measureFullness } from '@/lib/scoreModel'
 import { FIGURE_DRAG_TYPE } from '@/lib/durations'
-import { pitchAt, stringAt, yForPitch, findMeasureAt, findNoteAt, insertIndexForX } from '@/lib/staffGeometry'
+import { pitchAt, stringAt, yForPitch, ledgerLineYs, findMeasureAt, findNoteAt, insertIndexForX, PITCH_BAND_SPACINGS } from '@/lib/staffGeometry'
 
 const props = defineProps({
   // The score model to render (source of truth).
@@ -61,24 +61,18 @@ function buildQuietMarks() {
     const { state } = measureFullness(measure, timeSignature)
     if (state !== 'partial' && state !== 'over') continue
 
-    // The mark hangs slightly above whatever the measure actually holds: its
-    // anchor is the top staff line, pushed up by any notehead that climbs
-    // into the ledger territory — the mark observes, it never sits on a note.
-    let anchorY = drawn.topLineY
-    for (const note of measure.notes || []) {
-      if (note.isRest || !note.pitches?.length) continue
-      for (const pitch of note.pitches) {
-        const y = yForPitch(pitch, drawn)
-        if (y != null && y < anchorY) anchorY = y
-      }
-    }
+    // The mark hangs above the whole writable band — higher than the highest
+    // note a drop could possibly write — so it never obstructs a notehead or
+    // the drag preview, and all marks sit on one tidy height.
+    const bandTopY = drawn.topLineY - PITCH_BAND_SPACINGS * drawn.lineSpacing
 
     marks.push({
       measureIndex: drawn.measureIndex,
-      // Centred on the measure (the icon is 13px wide); 24px above the anchor
-      // clears the notehead (half a head plus a small breath of air).
+      // Centred on the measure (the icon is 13px wide); 22px above the band's
+      // top clears the highest notehead (half a head, the 13px icon, a small
+      // breath of air).
       left: drawn.x + drawn.width / 2 - 7,
-      top: anchorY - 24,
+      top: bandTopY - 22,
       message:
         state === 'partial'
           ? `Measure ${drawn.measureIndex + 1} is a little short of ${timeSignature} — no rush, fix it whenever.`
@@ -139,15 +133,60 @@ function onClick(event) {
   }
 }
 
+// The drag preview: where the dragged figure would land if dropped right now
+// — a circle on the snapped notehead spot, plus its ledger strokes when it
+// climbs outside the five lines. View state like the selection, never part of
+// the model; reactive (like the quiet marks) because the template pins it
+// over the manuscript. Null when no drag is over a writable spot.
+const dragPreview = ref(null)
+
+/**
+ * The preview for a drag hovering at this point — the same
+ * findMeasureAt/pitchAt/stringAt path onDrop takes, so the circle never lies
+ * about where the note will land. A string preview needs no ledger strokes:
+ * the six string lines are real. Null when the point snaps to nothing (a drop
+ * there would write nothing).
+ */
+function previewAt(point) {
+  if (!point || !layout) return null
+  const measure = findMeasureAt(layout, point.x, point.y)
+  if (!measure) return null
+
+  const pitch = pitchAt(point.y, measure)
+  if (pitch) {
+    const y = yForPitch(pitch, measure)
+    return { x: point.x, y, size: measure.lineSpacing, ledgerYs: ledgerLineYs(y, measure) }
+  }
+
+  const string = stringAt(point.y, measure)
+  if (string) {
+    // String n is the tab stave's (n − 1)th line from the top.
+    const y = measure.tabTopLineY + (string - 1) * measure.tabLineSpacing
+    return { x: point.x, y, size: measure.tabLineSpacing, ledgerYs: [] }
+  }
+
+  return null
+}
+
 // The browser only allows a drop where dragover is cancelled — so we cancel it
 // exactly when the drag carries a toolbar figure, and nowhere else. (The
 // payload itself is read in onDrop; during dragover only the types are
-// visible, by drag-and-drop design.)
+// visible, by drag-and-drop design — the preview therefore depends on the
+// position alone.)
 function onDragOver(event) {
   if (!props.interactive) return
   if (!event.dataTransfer.types.includes(FIGURE_DRAG_TYPE)) return
   event.preventDefault()
   event.dataTransfer.dropEffect = 'copy'
+  dragPreview.value = previewAt(pointFrom(event))
+}
+
+// The preview leaves with the drag. dragleave also fires when the pointer
+// merely crosses onto a child inside the canvas, so only a true exit — the
+// pointer's destination outside the host — clears it.
+function onDragLeave(event) {
+  if (host.value && host.value.contains(event.relatedTarget)) return
+  dragPreview.value = null
 }
 
 /**
@@ -159,6 +198,7 @@ function onDragOver(event) {
  * where none was aimed.
  */
 function onDrop(event) {
+  dragPreview.value = null
   if (!props.interactive || !layout) return
   const duration = event.dataTransfer.getData(FIGURE_DRAG_TYPE)
   if (!duration) return
@@ -193,6 +233,7 @@ function onDrop(event) {
       aria-label="Rendered score"
       @click="onClick"
       @dragover="onDragOver"
+      @dragleave="onDragLeave"
       @drop="onDrop"
     ></div>
 
@@ -225,6 +266,28 @@ function onDrop(event) {
         <path d="M12 16h.01" />
       </svg>
     </span>
+
+    <!-- The drag preview: a brass circle on the snapped landing spot, with
+         temporary ledger strokes when the spot sits outside the five lines.
+         pointer-events: none in the CSS keeps the overlay invisible to the
+         very dragover events that drive it. -->
+    <template v-if="dragPreview">
+      <span
+        v-for="y in dragPreview.ledgerYs"
+        :key="y"
+        class="score-canvas__preview-ledger"
+        :style="{ left: `${dragPreview.x}px`, top: `${y}px` }"
+      ></span>
+      <span
+        class="score-canvas__preview-note"
+        :style="{
+          left: `${dragPreview.x}px`,
+          top: `${dragPreview.y}px`,
+          width: `${dragPreview.size}px`,
+          height: `${dragPreview.size}px`
+        }"
+      ></span>
+    </template>
   </div>
 </template>
 
@@ -255,5 +318,27 @@ function onDrop(event) {
    become notes, and the notes themselves can be picked up with a click. */
 .score-canvas--interactive {
   cursor: crosshair;
+}
+
+/* The drag preview's circle — a thin brass outline about notehead size,
+   centred on the snapped spot. Brass is the selection colour: a suggestion,
+   not an observation (that's the quiet mark's oxblood). */
+.score-canvas__preview-note {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--accent-brass);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Temporary ledger strokes — hairlines a little wider than the circle, like
+   the real ledger lines the written note will get. */
+.score-canvas__preview-ledger {
+  position: absolute;
+  width: 18px;
+  height: 1px;
+  transform: translateX(-50%);
+  background: var(--accent-brass);
+  pointer-events: none;
 }
 </style>

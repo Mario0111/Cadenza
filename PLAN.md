@@ -254,3 +254,101 @@ from the tab stave"). Nothing is ever derived in either direction.
       switches, quiet mark, save/reload round-trip, print sheet, digit-click
       selection — no console errors); Mario's hands-on run pending
 - 🛑 **Stop, summarize, wait for Mario to try the feel.**
+
+---
+
+## Phase 10 — drag preview (Mario's call 2026-07-12)
+While a figure is dragged over the manuscript, show where it would land
+before the drop: a thin brass circle on the snapped landing spot (same
+snapping the drop uses), temporary ledger strokes when the spot climbs
+outside the five lines, the circle alone on a snapped tab string. Pure view
+state — an HTML overlay like the quiet marks, never drawn into VexFlow's SVG,
+never part of the model.
+- [x] `ledgerLineYs(noteY, measureLayout)` in `lib/staffGeometry.js` — the y
+      of every ledger stroke a notehead at that height needs (pure, commented
+      math on the half-spacing step grid; 35 headless assertions pass,
+      including a pitchAt↔yForPitch round trip so the circle never lies)
+- [x] `ScoreCanvas.vue`: reactive `dragPreview` ref set on dragover (position
+      only — the payload is unreadable during dragover by drag-and-drop
+      design), cleared on dragleave and drop; circle + ledger overlays in
+      brass, `pointer-events: none`
+- [~] Manual test: synthetic dragover/drop events in the browser — circle
+      follows line/space snapping, ledger strokes above and below the staff
+      (inclusive when the note sits ON a ledger), string snapping on the tab
+      stave (no ledgers), nothing in the stave gap or outside the band,
+      preview clears on dragleave and on drop, drops still write notes, no
+      console errors; Mario's hands-on drag pending
+- [x] Review round 1 (Mario): the quiet mark now hangs above the whole
+      writable band — higher than the highest note a drop could write — so it
+      never obstructs, and all marks share one height; the figure drag ghost
+      is the bare Bravura glyph (`setDragImage`), not a snapshot of the whole
+      button with its paper square
+- [x] Review round 2 (Mario): measures hug their figures. The formatter now
+      lays notes at their measured natural width instead of spreading them
+      across the measure, the measure is sized from that same number (plus
+      clef/time/barline room and a small trailing gap), and the row
+      justification from Phase 7 is gone — stretching lines to a straight
+      right edge was itself blank space between figures, so lines now end
+      where their music ends (supersedes the Phase 7 straight-edge call;
+      the print sheet shares the renderer, so it reads the same way).
+      Empty measures keep a 60px floor as drop room.
+- 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 11 — engraved spacing + beams (Mario's call 2026-07-12)
+The minimum-width packing from Phase 10 round 2 sat figures too close, the
+trailing gap didn't match the lead-in, and spacing ignored duration. New rule:
+the room after a figure is a FIXED amount per figure (longer figure, a bit
+more room — never proportional to time), the last figure sits as far from its
+barline as the first does from its own, and eighths or shorter can be beamed
+by hand.
+- [x] `lib/noteSpacing.js` (pure): FIGURE_SPACE table (w 58 · h 46 · q 36 ·
+      8th 28 · 16th 22 · 32nd 18 px — each halving of duration keeps more
+      than half the room; a dot adds a quarter), `spacingPlan()` → per-event
+      offsets + content width; 17 headless assertions pass
+- [x] Renderer: measures sized from the spacing plan; after VexFlow's
+      formatter aligns the staves, each event's shared tick context moves to
+      its fixed offset (notation + tab move together); trailing gap =
+      lead-in (allowances re-tuned against drawn geometry); proportional
+      squeeze only if a measure hits the width cap
+- [x] Beams, manual per the philosophy: `beamed: false` on the note event
+      (model + CLAUDE.md), `isBeamable()` in scoreModel (eighth or shorter,
+      pitched, not a rest; 8 browser assertions), store `toggleBeam`, a Beam
+      toggle in NoteToolbar (disabled unless the selection can beam),
+      renderer joins ADJACENT flagged notes with `new Beam(...)` — nothing is
+      ever beamed automatically; server untouched (measures are opaque JSON)
+- [~] Manual test in the browser: quarter gaps land at exactly 36px and a
+      mixed measure at its table values (46/28/28), trailing ≈ lead-in
+      (18.6 vs 17), beams draw/un-draw with the flags and replace the flag
+      glyphs, the flag survives save → reload, Both mode keeps digits in
+      their columns, no console errors; Mario's hands-on run pending
+- 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 12 — dot polish + slurs (Mario's call 2026-07-12)
+Three refinements on the last phase: a dotted figure should take the full
+1.5× room (not 1.25×), the augmentation dot should stay centred on its
+notehead even when the note sits ON a staff line (VexFlow lifts it into the
+space above — Mario wants it on the line), and notes can be connected with
+slurs, the same manual, flag-a-note way beams work.
+- [x] `noteSpacing.js`: DOT_FACTOR 1.25 → 1.5 (a dotted figure reserves 1.5×
+      its base room); assertion updated (17 pass)
+- [x] Renderer: after formatting, `centerDots` zeroes every notation dot's
+      `dot_shiftY` so it sits on the notehead's own line (VexFlow's format
+      pass had lifted on-line dots half a space up)
+- [x] Slurs, manual per the philosophy: `slurred: false` on the note event
+      (model + CLAUDE.md), `isSlurrable()` in scoreModel (pitched, not a rest,
+      not tab-only — any duration), store `toggleSlur`, a Slur toggle in
+      NoteToolbar (disabled unless the selection can slur), renderer joins
+      ADJACENT flagged notes with one `Curve` from first to last; the
+      beam-run logic refactored into a shared `adjacentRuns` helper both
+      features use — nothing is ever slurred automatically
+- [~] Manual test in the browser: dotted spacing measured 54px = 36 × 1.5;
+      dot centred at cy 100 on the line and cy 95 in the space; a 3-note slur
+      draws one curve over the whole run (x 98→158) and vanishes when
+      adjacency breaks or flags clear; a note both beamed and slurred renders
+      both (beam bar + slur on the notehead side) and survives save → reload
+      via the API; no console errors; Mario's hands-on run pending
+- 🛑 **Stop, summarize, wait for review + commit.**

@@ -19,7 +19,7 @@ import FingeringControls from '@/components/editor/FingeringControls.vue'
 import ModeSwitcher from '@/components/editor/ModeSwitcher.vue'
 import { useScoreStore } from '@/stores/score'
 import { DURATIONS } from '@/lib/durations'
-import { measureFullness } from '@/lib/scoreModel'
+import { measureFullness, isBeamable, isSlurrable } from '@/lib/scoreModel'
 import { SHEET_WIDTH } from '@/lib/printSheet'
 
 const store = useScoreStore()
@@ -242,11 +242,17 @@ function onKeydown(event) {
         :dotted="store.activeSettings.dotted"
         :is-rest="store.activeSettings.isRest"
         :has-selection="Boolean(store.selectedNote)"
+        :beamed="Boolean(store.selectedNote?.beamed)"
+        :can-beam="isBeamable(store.selectedNote)"
+        :slurred="Boolean(store.selectedNote?.slurred)"
+        :can-slur="isSlurrable(store.selectedNote)"
         :can-remove-measure="store.canRemoveMeasure"
         :status="status"
         @set-duration="store.setDuration"
         @toggle-dot="store.toggleDot"
         @toggle-rest="store.toggleRest"
+        @toggle-beam="store.toggleBeam"
+        @toggle-slur="store.toggleSlur"
         @delete-note="store.deleteSelectedNote"
         @add-measure="store.addMeasure"
         @remove-measure="store.removeSelectedMeasure"
@@ -295,6 +301,9 @@ function onKeydown(event) {
         again. With the manuscript focused: arrows move and transpose, a–g
         re-letter, 1–6 set the duration, period dots it, r writes rests, n adds
         the next note, Delete removes, Escape puts the pen down. Ctrl+S saves.
+        Beam joins a selected eighth (or shorter) to its beamed neighbours —
+        flag each note you want under the same beam. Slur works the same over
+        any notes: flag each one to arc a single curve across them.
       </p>
     </template>
   </section>

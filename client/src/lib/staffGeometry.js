@@ -28,8 +28,10 @@ const NOTE_HIT_RADIUS = 14
 
 // How far above/below the five lines a click still means "write a note here",
 // in line spacings. 3 spacings = 6 steps of ledger territory each way; beyond
-// that (e.g. on the tab stave below) a click is not note input.
-const PITCH_BAND_SPACINGS = 3
+// that (e.g. on the tab stave below) a click is not note input. Exported so
+// the quiet mark can sit clear of the whole band — above the highest note a
+// drop could possibly write.
+export const PITCH_BAND_SPACINGS = 3
 
 /**
  * Snap a click height to a pitch, or null when the click is outside the
@@ -59,6 +61,38 @@ export function yForPitch(pitch, measureLayout) {
   if (topLineY == null || !lineSpacing) return null
   const stepsBelowTopLine = TOP_LINE_STEP - pitchToStep(pitch)
   return topLineY + stepsBelowTopLine * (lineSpacing / 2)
+}
+
+/**
+ * The ledger strokes a notehead at this y needs: one at every full line
+ * position between the staff and the note, including the note's own position
+ * when it sits ON a ledger line. Returns their y values, [] for a notehead
+ * inside the staff (or when there is no notation stave to measure against).
+ *
+ * The math works on the staff's half-spacing grid, measured in steps below
+ * the top line: lines sit on EVEN steps, spaces on odd ones, and the five
+ * staff lines cover steps 0..8. So a notehead above step 0 needs a ledger at
+ * every even step from -2 up to its own; below step 8, at every even step
+ * from 10 down to its own. (A note in the space just outside the staff —
+ * step -1 or 9 — touches the outer staff line and needs no ledger.)
+ */
+export function ledgerLineYs(noteY, measureLayout) {
+  const { topLineY, lineSpacing } = measureLayout
+  if (topLineY == null || !lineSpacing) return []
+
+  const halfSpacing = lineSpacing / 2
+  const noteStep = Math.round((noteY - topLineY) / halfSpacing)
+  const ys = []
+  if (noteStep < 0) {
+    for (let lineStep = -2; lineStep >= noteStep; lineStep -= 2) {
+      ys.push(topLineY + lineStep * halfSpacing)
+    }
+  } else if (noteStep > 8) {
+    for (let lineStep = 10; lineStep <= noteStep; lineStep += 2) {
+      ys.push(topLineY + lineStep * halfSpacing)
+    }
+  }
+  return ys
 }
 
 /**

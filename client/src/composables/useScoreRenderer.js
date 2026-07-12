@@ -26,6 +26,8 @@ import {
   GhostNote,
   Voice,
   Formatter,
+  Beam,
+  Curve,
   Dot,
   StaveConnector,
   FretHandFinger,
@@ -34,20 +36,21 @@ import {
 } from 'vexflow'
 
 import { toVexflowDuration } from '@/lib/durations'
-import { noteHasTab, isTabOnly } from '@/lib/scoreModel'
+import { noteHasTab, isTabOnly, isBeamable, isSlurrable } from '@/lib/scoreModel'
+import { spacingPlan } from '@/lib/noteSpacing'
 
 /* ---- Layout constants (all in px on VexFlow's canvas) ---------------------
  * These shape the "tidy paper" look: measures grow with their contents but
  * never below a readable minimum or past a crowded maximum.
  */
 const PAGE_MARGIN = 10 // gutter around the whole system
-const MIN_MEASURE_WIDTH = 120 // a one-note measure still needs room to breathe
+const MIN_MEASURE_WIDTH = 60 // an empty measure still keeps a droppable spot
 const MAX_MEASURE_WIDTH = 520 // stop a dense measure from stretching forever
-const CONTENT_PADDING = 30 // breathing room added to the notes' minimum width
-const CLEF_ALLOWANCE = 40 // extra width when a measure re-states the clef (line start)
-const TIME_ALLOWANCE = 26 // extra width for the time signature (very first measure)
-const BARLINE_ALLOWANCE = 16 // slack for the opening barline on interior measures
-const TRAILING_SPACE = 16 // gap left between the last note and the closing barline
+const CLEF_ALLOWANCE = 36 // extra width when a measure re-states the clef (line start)
+const TIME_ALLOWANCE = 25 // extra width for the time signature (very first measure)
+const BARLINE_ALLOWANCE = 16 // room the opening barline takes before the first note
+const TRAILING_SPACE = 16 // gap after the last figure — the same as the lead-in,
+// so the last figure sits as far from its barline as the first does from its own
 const TAB_OFFSET = 110 // vertical drop from the notation stave to the tab stave
 
 /*
@@ -172,25 +175,14 @@ function makeGhost(note) {
 }
 
 /**
- * The minimum width the notes in a measure need, measured by VexFlow itself.
- * This is what makes measures density-driven: crowded measures report a larger
- * minimum and end up wider; sparse ones report less and shrink. Empty measures
- * report 0. Returns 0 when there is nothing to format.
+ * Final drawn width of a measure: exactly what its figures need under the
+ * engraving rule (see lib/noteSpacing.js), plus whatever leading glyphs it
+ * carries (clef at a line start, time signature on the very first measure)
+ * and the trailing gap before the closing barline. Measures hug their
+ * figures — no room is added for them to spread into.
  */
-function contentMinWidth(voices) {
-  if (!voices.length) return 0
-  const formatter = new Formatter()
-  voices.forEach((voice) => formatter.joinVoices([voice]))
-  return formatter.preCalculateMinTotalWidth(voices)
-}
-
-/**
- * Final drawn width of a measure: its content minimum plus padding and whatever
- * leading glyphs it carries (clef at a line start, time signature on the very
- * first measure), clamped so every measure stays tidy.
- */
-function measureWidth(minContent, { isLineStart, isFirstOverall }) {
-  let width = minContent + CONTENT_PADDING + BARLINE_ALLOWANCE
+function measureWidth(contentWidth, { isLineStart, isFirstOverall }) {
+  let width = contentWidth + BARLINE_ALLOWANCE + TRAILING_SPACE
   if (isLineStart) width += CLEF_ALLOWANCE
   if (isFirstOverall) width += TIME_ALLOWANCE
   return Math.max(MIN_MEASURE_WIDTH, Math.min(MAX_MEASURE_WIDTH, width))
@@ -250,24 +242,15 @@ function planMeasures(score, { showNotation, showTab, selection, selectionInk })
       if (selectedTabEntry) selectedTabEntry.tabNote.setStyle(brass)
     }
 
-    // Measure the content with throwaway voices so we can size the measure.
-    // A voice with nothing visible on its stave (all ghosts) is left out
-    // entirely — same rule as when drawing.
-    const measuringVoices = []
-    if (staveEntries.length) {
-      measuringVoices.push(makeSoftVoice(score.timeSignature).addTickables(staveNotes))
-    }
-    if (tabEntries.length) {
-      measuringVoices.push(makeSoftVoice(score.timeSignature).addTickables(tabNotes))
-    }
-
     return {
       measureIndex,
       staveEntries,
       staveNotes,
       tabEntries,
       tabNotes,
-      minContent: contentMinWidth(measuringVoices)
+      // The engraving rule's plan: each event's fixed offset and the total
+      // width the figures need (see lib/noteSpacing.js).
+      spacing: spacingPlan(notes)
     }
   })
 }
@@ -277,9 +260,10 @@ function planMeasures(score, { showNotation, showTab, selection, selectionInk })
  * each its x, width, and whether it starts a line. Standard engraving: every
  * line restates the clef; only the very first measure shows the time signature.
  *
- * Then every full row is JUSTIFIED to the page width, so all systems share one
- * straight right edge — the way an engraved page reads. The last row is left
- * at its natural width: the music simply ends where it ends.
+ * Rows keep their natural width — measures hug their figures, and a line ends
+ * where its music ends (Mario's call, replacing the earlier justified right
+ * edge: stretching rows to the margin put blank space back between the
+ * figures, which is exactly what measure-hugging is for).
  */
 function layoutRows(plans, pageWidth) {
   const usable = pageWidth - PAGE_MARGIN
@@ -290,7 +274,7 @@ function layoutRows(plans, pageWidth) {
   plans.forEach((plan, index) => {
     const isFirstOverall = index === 0
     const startsRow = row.length === 0
-    let width = measureWidth(plan.minContent, { isLineStart: startsRow, isFirstOverall })
+    let width = measureWidth(plan.spacing.contentWidth, { isLineStart: startsRow, isFirstOverall })
 
     // If an interior measure would overflow the line, wrap it to a new row —
     // where it becomes a line start and re-states the clef (hence re-measured).
@@ -298,7 +282,7 @@ function layoutRows(plans, pageWidth) {
       rows.push(row)
       row = []
       x = PAGE_MARGIN
-      width = measureWidth(plan.minContent, { isLineStart: true, isFirstOverall })
+      width = measureWidth(plan.spacing.contentWidth, { isLineStart: true, isFirstOverall })
     }
 
     plan.x = x
@@ -310,36 +294,55 @@ function layoutRows(plans, pageWidth) {
   })
 
   if (row.length) rows.push(row)
-
-  rows.forEach((packed, rowIndex) => {
-    if (rowIndex < rows.length - 1) justifyRow(packed, pageWidth)
-  })
   return rows
 }
 
 /**
- * Stretch one row's measures so the line ends exactly at the right margin.
- * Each measure grows in proportion to its natural width, so a dense measure
- * takes more of the slack than a sparse one — the formatter then spreads the
- * notes into the extra room. Packing guarantees the row already fits, so this
- * only ever stretches (never squeezes), and filling the line outranks the
- * MAX_MEASURE_WIDTH clamp used while packing.
+ * Group a measure's drawn notation notes into maximal runs of ADJACENT notes
+ * that all pass `flagged` — the shape both beams and slurs need. "Adjacent"
+ * means consecutive noteIndexes, so anything between two flagged notes that
+ * has no notehead here — a rest, an unflagged note, a tab-only event (which
+ * isn't a staveEntry at all) — breaks the run. Each run is an array of
+ * StaveNotes in written order; runs shorter than two are dropped, since a beam
+ * or a slur needs at least two notes.
  */
-function justifyRow(row, pageWidth) {
-  const target = pageWidth - PAGE_MARGIN * 2
-  const natural = row.reduce((sum, plan) => sum + plan.width, 0)
-  if (natural <= 0) return
-  const stretch = target / natural
-  let x = PAGE_MARGIN
-  row.forEach((plan) => {
-    plan.x = x
-    plan.width = plan.width * stretch
-    x += plan.width
-  })
-  // Rounding drift adds up across the row; pin the last measure's right edge
-  // to the margin exactly so every system shares one straight edge.
-  const last = row[row.length - 1]
-  last.width = PAGE_MARGIN + target - last.x
+function adjacentRuns(staveEntries, notes, flagged) {
+  const runs = []
+  let run = []
+  let lastIndex = null
+  const close = () => {
+    if (run.length > 1) runs.push(run)
+    run = []
+  }
+  for (const { staveNote, noteIndex } of staveEntries) {
+    const note = notes[noteIndex]
+    if (!note || !flagged(note)) {
+      close()
+    } else {
+      if (run.length && noteIndex !== lastIndex + 1) close()
+      run.push(staveNote)
+    }
+    lastIndex = noteIndex
+  }
+  close()
+  return runs
+}
+
+/**
+ * Pull every augmentation dot back onto its notehead's own line. VexFlow's
+ * format pass lifts a dot half a space when the note sits ON a line (so the
+ * staff line doesn't run through the dot), which reads as the dot floating
+ * above the note. Mario's call: keep the dot centred on the note — on the line
+ * when the note is on a line, in the space otherwise. dot_shiftY is written
+ * during formatting, so this runs after format and before draw, zeroing the
+ * vertical shift the formatter added.
+ */
+function centerDots(staveNotes) {
+  for (const staveNote of staveNotes) {
+    for (const dot of staveNote.getModifiersByType('Dot')) {
+      dot.setDotShiftY(0)
+    }
+  }
 }
 
 /**
@@ -415,17 +418,60 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
   // planMeasures), the formatter lands every event's notehead and tab digit in
   // the same column — a note absent from one stave leaves a gap there instead
   // of letting the columns drift apart.
-  const reference = notationStave || tabStave
-  // Format into the note area MINUS a trailing gap, so the last note doesn't sit
-  // flush against the closing barline. Applies to both staves (they share this
-  // width), so notation and tab both get the same neat right margin.
-  const noteArea = reference.getNoteEndX() - reference.getNoteStartX()
-  const formatWidth = Math.max(MIN_MEASURE_WIDTH / 2, noteArea - TRAILING_SPACE)
+  // Beams and slurs — both manual, both read straight from the notes' flags,
+  // both drawn over a maximal run of ADJACENT flagged notes (see adjacentRuns).
+  // A beam joins the stems of eighths-or-shorter; a slur arcs one curve from
+  // the first note of its run to the last. Built here; drawn after the voices,
+  // the way VexFlow wants. Nothing is ever beamed or slurred automatically.
+  const measureNotes = score.measures[plan.measureIndex]?.notes || []
+  const beams = adjacentRuns(
+    plan.staveEntries,
+    measureNotes,
+    (note) => note.beamed && isBeamable(note)
+  ).map((notes) => new Beam(notes, true))
+  const slurs = adjacentRuns(
+    plan.staveEntries,
+    measureNotes,
+    (note) => note.slurred && isSlurrable(note)
+  ).map((notes) => new Curve(notes[0], notes[notes.length - 1]))
+
   const formatter = new Formatter()
   voices.forEach(({ voice }) => formatter.joinVoices([voice]))
-  formatter.format(voices.map((v) => v.voice), formatWidth)
+  formatter.format(voices.map((v) => v.voice), Math.max(10, plan.spacing.contentWidth))
+
+  // Formatting decided the dots' vertical shift; re-centre them on their notes.
+  centerDots(plan.staveEntries.map((entry) => entry.staveNote))
+
+  /*
+   * The engraving rule takes over the horizontal. The formatter above did two
+   * jobs we keep — aligning both staves' voices onto shared tick contexts and
+   * laying out each note's modifiers — but its spacing is proportional and
+   * context-dependent, and the rule wants FIXED room per figure (see
+   * lib/noteSpacing.js). So each event's tick context is moved to its planned
+   * offset from the first event, which stays where the formatter put it, just
+   * after the barline (or clef). A context is shared by an event's notehead
+   * and tab digit, so both staves move together and stay in column. If the
+   * measure hit the width cap, the offsets squeeze proportionally — figures
+   * keep their relative spacing.
+   */
+  const tickables = voices[0].voice.getTickables()
+  if (tickables.length) {
+    const leading =
+      BARLINE_ALLOWANCE +
+      (plan.isLineStart ? CLEF_ALLOWANCE : 0) +
+      (plan.showTimeSignature ? TIME_ALLOWANCE : 0)
+    const budget = plan.width - leading - TRAILING_SPACE
+    const scale =
+      plan.spacing.contentWidth > budget ? budget / plan.spacing.contentWidth : 1
+    const baseX = tickables[0].getTickContext().getX()
+    tickables.forEach((tickable, i) => {
+      tickable.getTickContext().setX(baseX + plan.spacing.offsets[i] * scale)
+    })
+  }
 
   voices.forEach(({ voice, stave }) => voice.draw(context, stave))
+  beams.forEach((beam) => beam.setContext(context).draw())
+  slurs.forEach((slur) => slur.setContext(context).draw())
 
   // Note positions are only known after drawing. Each note's x comes from
   // whichever stave drew it, preferring the notation stave when it is on both

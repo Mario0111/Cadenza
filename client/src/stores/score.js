@@ -14,7 +14,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { createScore, createMeasure, defaultNextNote, isTabOnly } from '@/lib/scoreModel'
+import { createScore, createMeasure, defaultNextNote, isTabOnly, isBeamable, isSlurrable } from '@/lib/scoreModel'
 import { shiftPitch, setPitchLetter } from '@/lib/pitches'
 import * as scoresApi from '@/api/scores'
 
@@ -308,6 +308,32 @@ export const useScoreStore = defineStore('score', () => {
   }
 
   /**
+   * Toggle the beam flag on the selected note — beaming is by hand, like
+   * everything else. Only a beamable note (an eighth or shorter with a stem
+   * on the notation stave) takes the flag; the renderer then joins ADJACENT
+   * flagged notes under one beam. Nothing is ever beamed for you.
+   */
+  function toggleBeam() {
+    const note = selectedNote.value
+    if (!isBeamable(note)) return
+    note.beamed = !note.beamed
+    markDirty()
+  }
+
+  /**
+   * Toggle the slur flag on the selected note — slurring is by hand too. Any
+   * pitched note can carry the flag; the renderer arcs one slur over each run
+   * of ADJACENT flagged notes. A lone flagged note shows nothing until its
+   * neighbour is flagged as well. Nothing is ever slurred for you.
+   */
+  function toggleSlur() {
+    const note = selectedNote.value
+    if (!isSlurrable(note)) return
+    note.slurred = !note.slurred
+    markDirty()
+  }
+
+  /**
    * Move the selected note by `delta` staff positions (±7 = an octave). For a
    * tab-only note "up" and "down" mean the neighbouring string instead — one
    * string per press, whatever the delta, since strings have no octaves. The
@@ -503,6 +529,8 @@ export const useScoreStore = defineStore('score', () => {
     setDuration,
     toggleDot,
     toggleRest,
+    toggleBeam,
+    toggleSlur,
     transposeSelected,
     setSelectedLetter,
     deleteSelectedNote,

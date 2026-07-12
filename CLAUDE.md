@@ -103,8 +103,15 @@ The app should feel like **writing on paper, with quality of life** — not like
   measures are a *feature* here, not an error.
 - `Stave` for notation, `TabStave` for tablature, `StaveConnector` to link them in
   "tab under notation" mode.
-- Use VexFlow's formatter for note spacing, but compute each measure's width from its
-  note density so crowded measures widen and sparse ones shrink.
+- VexFlow's formatter aligns the staves' voices and lays out modifiers; the horizontal
+  spacing itself follows the fixed per-figure rule in `lib/noteSpacing.js` (longer
+  figure, a bit more room — deterministic, never proportional to time), and each
+  measure's width comes from that same rule so measures hug their figures.
+- Beams and slurs are manual: the note event's `beamed` / `slurred` flags, set by hand;
+  the renderer joins adjacent flagged notes with `Beam` (eighths-or-shorter) or one
+  `Curve` slur (any notes). Nothing is ever beamed or slurred automatically.
+- The augmentation dot stays centred on its notehead — VexFlow's format pass lifts an
+  on-line dot into the space above, and the renderer zeroes that shift after formatting.
 - Left-hand fingering (1–4): `FretHandFinger` modifier near the notehead.
   Right-hand fingering (p/i/m/a): `Annotation` positioned below the note.
 - **No custom canvas rendering.**
@@ -121,6 +128,8 @@ Score: `title`, `description`, `timeSignature`, `keySignature`,
   duration: "q",                  // w h q 8 16, dotted: boolean flag alongside
   dotted: false,
   isRest: false,
+  beamed: false,                  // manual; adjacent flagged 8ths-or-shorter share one beam
+  slurred: false,                 // manual; adjacent flagged notes share one slur curve
   strings: [1, null],             // per-pitch, nullable — tabs are manual
   frets:   [0, null],             // per-pitch, nullable
   leftFinger: null,               // 1..4 | null

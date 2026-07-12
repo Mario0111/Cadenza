@@ -14,6 +14,14 @@ defineProps({
   isRest: { type: Boolean, required: true },
   // Whether a note is selected (the toolbar edits it instead of the pen).
   hasSelection: { type: Boolean, default: false },
+  // The selected note's beam flag, and whether it can carry one at all
+  // (an eighth or shorter with a stem — see isBeamable in scoreModel).
+  beamed: { type: Boolean, default: false },
+  canBeam: { type: Boolean, default: false },
+  // The selected note's slur flag, and whether it can carry one (any pitched
+  // note — see isSlurrable in scoreModel).
+  slurred: { type: Boolean, default: false },
+  canSlur: { type: Boolean, default: false },
   canRemoveMeasure: { type: Boolean, default: false },
   // Quiet status line: "Measure 2, note 3 — editing" / "Writing quarters", …
   status: { type: String, default: '' }
@@ -23,6 +31,8 @@ defineEmits([
   'set-duration',
   'toggle-dot',
   'toggle-rest',
+  'toggle-beam',
+  'toggle-slur',
   'delete-note',
   'add-measure',
   'remove-measure'
@@ -45,10 +55,15 @@ const durationTitle = (option, index) =>
   `${option.label} note — drag onto the staff to write it, or key ${index + 1}`
 
 // Dragging a figure carries its duration code; the manuscript's drop handler
-// reads it back and writes the note there.
+// reads it back and writes the note there. The drag ghost is the bare glyph —
+// snapshotting the whole button would drag its paper square along too.
 function onFigureDragStart(event, code) {
   event.dataTransfer.setData(FIGURE_DRAG_TYPE, code)
   event.dataTransfer.effectAllowed = 'copy'
+  const glyph = event.currentTarget.querySelector('.note-toolbar__glyph')
+  if (glyph) {
+    event.dataTransfer.setDragImage(glyph, glyph.offsetWidth / 2, glyph.offsetHeight / 2)
+  }
 }
 </script>
 
@@ -96,6 +111,28 @@ function onFigureDragStart(event, code) {
       >
         <span class="note-toolbar__glyph note-toolbar__glyph--small" aria-hidden="true">{{ REST_GLYPH }}</span>
         Rest
+      </button>
+      <button
+        type="button"
+        class="note-toolbar__button note-toolbar__button--labelled"
+        :class="{ 'note-toolbar__button--active': beamed }"
+        title="Beam — an eighth or shorter joins its beamed neighbours"
+        :aria-pressed="beamed"
+        :disabled="!canBeam"
+        @click="$emit('toggle-beam')"
+      >
+        Beam
+      </button>
+      <button
+        type="button"
+        class="note-toolbar__button note-toolbar__button--labelled"
+        :class="{ 'note-toolbar__button--active': slurred }"
+        title="Slur — a note joins its slurred neighbours under one curve"
+        :aria-pressed="slurred"
+        :disabled="!canSlur"
+        @click="$emit('toggle-slur')"
+      >
+        Slur
       </button>
     </div>
 
