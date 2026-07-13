@@ -42,6 +42,8 @@ export function createScore(overrides = {}) {
   return {
     title: 'Untitled score',
     description: '',
+    bpm: null, // beats per minute — the engraved tempo, optional
+    composer: '', // the engraved credit on the sheet's right, optional
     timeSignature: '4/4',
     keySignature: 'C',
     displayMode: 'both', // 'notation' | 'tab' | 'both'

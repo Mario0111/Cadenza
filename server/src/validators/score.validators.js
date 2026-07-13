@@ -8,6 +8,16 @@ const optionalScoreFields = [
     .optional()
     .isString()
     .withMessage('A description has to be text.'),
+  // `values: 'null'` lets a client clear the tempo by sending null; a set
+  // tempo has to be a whole number of beats per minute in a playable range.
+  body('bpm')
+    .optional({ values: 'null' })
+    .isInt({ min: 1, max: 400 })
+    .withMessage('A tempo has to be a whole number of beats per minute, like 120.'),
+  body('composer')
+    .optional()
+    .isString()
+    .withMessage('A composer has to be text.'),
   body('timeSignature')
     .optional()
     .isString()

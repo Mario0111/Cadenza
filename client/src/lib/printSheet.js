@@ -20,6 +20,8 @@ const SHEET_MARGIN = 36 // white border around everything on the PDF page
 const TITLE_SIZE = 26 // matches the sheet's on-screen title (--text-xl)
 const DESCRIPTION_SIZE = 14
 const DESCRIPTION_GAP = 24 // title baseline → description baseline
+const CREDITS_SIZE = 13 // the credits line: tempo left, composer right
+const CREDITS_GAP = 22 // last centred baseline → credits baseline
 const SCORE_GAP = 20 // last header baseline → top of the score SVG
 
 /**
@@ -42,18 +44,26 @@ export function pdfFilename(title) {
  * text), so the title's baseline sits a full glyph height below the margin.
  * Returns every coordinate the export needs; nothing is computed twice.
  */
-export function pdfLayout({ svgWidth, svgHeight, hasDescription }) {
+export function pdfLayout({ svgWidth, svgHeight, hasDescription, hasCredits }) {
   const titleBaseline = SHEET_MARGIN + TITLE_SIZE
   const descriptionBaseline = hasDescription
     ? titleBaseline + DESCRIPTION_GAP
     : titleBaseline
-  const scoreTop = descriptionBaseline + SCORE_GAP
+  // The credits line (tempo left, composer right) hangs below whichever
+  // centred line came last; without one, its baseline collapses onto that
+  // line so the score's gap stays the same.
+  const creditsBaseline = hasCredits
+    ? descriptionBaseline + CREDITS_GAP
+    : descriptionBaseline
+  const scoreTop = creditsBaseline + SCORE_GAP
   return {
     margin: SHEET_MARGIN,
     titleSize: TITLE_SIZE,
     descriptionSize: DESCRIPTION_SIZE,
+    creditsSize: CREDITS_SIZE,
     titleBaseline,
     descriptionBaseline,
+    creditsBaseline,
     scoreTop,
     pageWidth: svgWidth + SHEET_MARGIN * 2,
     pageHeight: scoreTop + svgHeight + SHEET_MARGIN

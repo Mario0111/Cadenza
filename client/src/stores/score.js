@@ -101,6 +101,9 @@ export const useScoreStore = defineStore('score', () => {
       score.value = createScore({
         title: loaded.title,
         description: loaded.description,
+        // Older documents predate these fields — they open quietly unset.
+        bpm: loaded.bpm ?? null,
+        composer: loaded.composer || '',
         timeSignature: loaded.timeSignature,
         keySignature: loaded.keySignature,
         // The tab-only display mode was cut; a score saved back when it
@@ -138,6 +141,8 @@ export const useScoreStore = defineStore('score', () => {
     const payload = {
       title: score.value.title,
       description: score.value.description,
+      bpm: score.value.bpm,
+      composer: score.value.composer,
       timeSignature: score.value.timeSignature,
       keySignature: score.value.keySignature,
       displayMode: score.value.displayMode,
@@ -172,6 +177,21 @@ export const useScoreStore = defineStore('score', () => {
 
   function setDescription(description) {
     score.value.description = description
+    markDirty()
+  }
+
+  /**
+   * Set (or clear, with null) the tempo. Same guard style as frets: only a
+   * whole number in a playable range lands; anything else is quietly ignored.
+   */
+  function setBpm(bpm) {
+    if (bpm != null && !(Number.isInteger(bpm) && bpm >= 1 && bpm <= 400)) return
+    score.value.bpm = bpm
+    markDirty()
+  }
+
+  function setComposer(composer) {
+    score.value.composer = composer
     markDirty()
   }
 
@@ -519,6 +539,8 @@ export const useScoreStore = defineStore('score', () => {
     saveScore,
     setTitle,
     setDescription,
+    setBpm,
+    setComposer,
     setTimeSignature,
     setDisplayMode,
     selectNote,

@@ -352,3 +352,84 @@ slurs, the same manual, flag-a-note way beams work.
       both (beam bar + slur on the notehead side) and survives save → reload
       via the API; no console errors; Mario's hands-on run pending
 - 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 13 — library score previews (Mario's call 2026-07-12)
+The library reads as a list of titles. Give each card a small visual PREVIEW of
+the score's opening at the top, so the folio reads like a shelf of little
+manuscripts. No new rendering code and no VexFlow — a preview is just a
+non-interactive `ScoreCanvas` at a small page width, clipped to the first
+system. No backend change: `GET /api/scores` already returns full documents
+(measures included), so the card renders straight from the `score` prop it
+already has.
+- [x] `ScorePreview.vue` (presentational): a warm-paper, hairline-bordered,
+      small-radius frame — a mini sheet carrying the engraved plate TITLE above
+      the opening TWO systems of music. The whole frame is a `RouterLink` into
+      the editor — a second way in; the title link and Open button stay the
+      primary path.
+- [x] Renders through the shared `useScoreRenderer` (same renderer as the editor
+      and print sheet) directly rather than via `ScoreCanvas`, because the
+      preview needs the SVG itself: drawn at the full sheet width, then scaled
+      DOWN to the card by giving the SVG a `viewBox` (CSS width:100%) — that
+      scaling is the "zoomed out" look, and the line breaks match the real sheet.
+- [x] Honor the score's own `displayMode` (a tab piece previews WITH its tab —
+      forcing notation would render a tab-only score as blank staves, and hide
+      tab on every "both" score).
+- [x] The viewBox is CROPPED to the first two systems (heights mirror the
+      renderer's 130 / 264 + 10px margin), so only the opening shows; measures
+      are sliced to an opening cap so a long score doesn't build VexFlow objects
+      the crop hides — "render only what's shown".
+- [x] Empty score (no notes anywhere — tab-only notes count as content, so this
+      is `notes.length`, not the quiet-mark arithmetic) shows a calm
+      "Empty score" placeholder on an aged-cream well, never a blank/broken box.
+- [x] `ScoreCard.vue`: mount `ScorePreview` ABOVE the title; card lifecycle
+      (rename/delete) untouched, existing actions keep working.
+- [x] Note (not build): offscreen cards could lazy-render via IntersectionObserver
+      if a folio grew large — one small SVG per card is fine for a school library.
+- [~] Manual test: browser-verified against the live API — the SVG scales to
+      the card (287px inside a 305 frame, ≈0.42×, "zoomed out"), the viewBox
+      crops to two systems and both are drawn (64 + 62 glyphs top/second row),
+      the centred plate title shows, the empty card shows the aged-cream
+      "Empty score" well, the (pre-existing) tab-only card previews with its tab,
+      previews are RouterLinks that don't intercept card clicks, no console
+      errors; Mario's hands-on run pending.
+- 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 14 — the engraved sheet header in the editor + tempo & composer (Mario's call 2026-07-13)
+The editor's title/description were chrome above the desk; on the printed sheet
+they are engraved on the paper. Move them ONTO the manuscript plate, styled
+exactly as they print (centred display title, centred italic description), and
+add two new score fields in the engraved corners: tempo in bpm on the left,
+the composer's name on the right — the classical plate layout, on sheet, print
+and PDF alike.
+- [x] Data model: `bpm` (number | null) and `composer` (string, default '')
+      on the Score — server model, WRITABLE_FIELDS, validators (optional,
+      quiet messages; `values: 'null'` so a tempo can be cleared), `createScore`
+      defaults, CLAUDE.md
+- [x] Store: load/save the two fields (older documents open quietly unset);
+      `setBpm` / `setComposer` actions (bpm kept as an integer 1–400 or null,
+      same guard style as frets — an invalid entry snaps back on re-render)
+- [x] `SheetHeader.vue` (editor/): the engraved header as quiet inputs dressed
+      like the printed text — centred title, centred italic description, a
+      small tempo field left and composer field right on the credits line just
+      above the music; sits on the plate, above the manuscript and OUTSIDE the
+      keyboard region so typing a title never trips the note shortcuts
+- [x] `EditorPage.vue`: title/description inputs leave the head chrome (time,
+      mode, save stay); `SheetHeader` joins the plate
+- [x] `PrintPage.vue`: the same credits line on the sheet — "120 bpm" left,
+      composer right, only when set
+- [x] PDF: `pdfLayout` gains the credits baseline (6 headless assertions pass);
+      `usePdfExport` draws tempo left-aligned and composer right-aligned in the
+      header ink ("120 bpm" plain text — the classical "♩ =" form needs a music
+      font embedded in jsPDF; flagged, not built)
+- [~] Manual test: exercised in the browser against the live API — create with
+      bpm+composer, 400 on a bad bpm, null clears, header renders centred/left/
+      right on the plate with the old chrome inputs gone, edits round-trip
+      through Save, invalid tempo snaps back, print sheet shows the credits in
+      symmetric corners above the music, blank score shows quiet placeholders,
+      no console errors; Mario's hands-on run (incl. an actual PDF download)
+      pending
+- 🛑 **Stop, summarize, wait for review + commit.**

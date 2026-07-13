@@ -69,7 +69,15 @@ export function usePdfExport() {
 
       const title = score.title || 'Untitled score'
       const description = (score.description || '').trim()
-      const layout = pdfLayout({ svgWidth, svgHeight, hasDescription: Boolean(description) })
+      // The credits line: tempo left, composer right — same text as the sheet.
+      const tempo = score.bpm ? `${score.bpm} bpm` : ''
+      const composer = (score.composer || '').trim()
+      const layout = pdfLayout({
+        svgWidth,
+        svgHeight,
+        hasDescription: Boolean(description),
+        hasCredits: Boolean(tempo || composer)
+      })
 
       const doc = new jsPDF({
         unit: 'px',
@@ -94,6 +102,19 @@ export function usePdfExport() {
         doc.setFont('times', 'italic')
         doc.setFontSize(layout.descriptionSize)
         doc.text(description, layout.pageWidth / 2, layout.descriptionBaseline, { align: 'center' })
+      }
+
+      if (tempo || composer) {
+        doc.setFont('times', 'italic')
+        doc.setFontSize(layout.creditsSize)
+        if (tempo) {
+          doc.text(tempo, layout.margin, layout.creditsBaseline)
+        }
+        if (composer) {
+          doc.text(composer, layout.pageWidth - layout.margin, layout.creditsBaseline, {
+            align: 'right'
+          })
+        }
       }
 
       await doc.svg(withPrintableText(svg), {

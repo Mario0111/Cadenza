@@ -17,6 +17,7 @@ import NoteToolbar from '@/components/editor/NoteToolbar.vue'
 import ScoreCanvas from '@/components/editor/ScoreCanvas.vue'
 import FingeringControls from '@/components/editor/FingeringControls.vue'
 import ModeSwitcher from '@/components/editor/ModeSwitcher.vue'
+import SheetHeader from '@/components/editor/SheetHeader.vue'
 import { useScoreStore } from '@/stores/score'
 import { DURATIONS } from '@/lib/durations'
 import { measureFullness, isBeamable, isSlurrable } from '@/lib/scoreModel'
@@ -179,26 +180,10 @@ function onKeydown(event) {
       <header class="editor__head">
         <p class="cadenza-eyebrow">The desk</p>
 
+        <!-- The head keeps only the working controls — the title, description,
+             tempo and composer are written on the sheet itself (SheetHeader),
+             exactly where they print. -->
         <div class="editor__meta">
-          <div class="editor__titles">
-            <input
-              class="editor__title-input"
-              type="text"
-              aria-label="Score title"
-              placeholder="Untitled score"
-              :value="store.score.title"
-              @input="store.setTitle($event.target.value)"
-            />
-            <input
-              class="editor__description-input"
-              type="text"
-              aria-label="Score description"
-              placeholder="Add a description — optional"
-              :value="store.score.description"
-              @input="store.setDescription($event.target.value)"
-            />
-          </div>
-
           <div class="editor__controls">
             <label class="editor__time">
               <span class="editor__time-label">Time</span>
@@ -260,6 +245,19 @@ function onKeydown(event) {
 
       <div class="editor__body">
         <PaperCard class="editor__plate">
+          <!-- The engraved header lives on the plate, above the music, and
+               OUTSIDE .editor__page — so typing a title never trips the
+               manuscript's keyboard shortcuts. -->
+          <SheetHeader
+            :title="store.score.title"
+            :description="store.score.description"
+            :bpm="store.score.bpm"
+            :composer="store.score.composer"
+            @update:title="store.setTitle"
+            @update:description="store.setDescription"
+            @update:bpm="store.setBpm"
+            @update:composer="store.setComposer"
+          />
           <div
             class="editor__page"
             tabindex="0"
@@ -314,72 +312,12 @@ function onKeydown(event) {
   margin-bottom: var(--space-5);
 }
 
-/* Title on the left, working controls on the right — the manuscript's
-   editorial asymmetry carried up into the chrome. Wraps quietly when narrow. */
+/* The head is working controls only now — the sheet's words live on the plate. */
 .editor__meta {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: var(--space-5);
   flex-wrap: wrap;
-}
-
-.editor__titles {
-  flex: 1;
-  min-width: 260px;
-}
-
-/* The title is written directly on the page — an input dressed as a heading.
-   The hairline underneath only appears when you're actually writing in it. */
-.editor__title-input {
-  width: 100%;
-  padding: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  color: var(--text-primary);
-  background: transparent;
-  border: none;
-  border-bottom: var(--border-hair) solid transparent;
-  transition: var(--t-control);
-}
-
-.editor__title-input:hover,
-.editor__title-input:focus {
-  border-bottom-color: var(--border-strong);
-}
-
-.editor__title-input:focus-visible {
-  outline: none;
-  border-bottom-color: var(--accent-brass);
-}
-
-.editor__description-input {
-  width: 100%;
-  margin-top: var(--space-2);
-  padding: 0;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: var(--text-md);
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-bottom: var(--border-hair) solid transparent;
-  transition: var(--t-control);
-}
-
-.editor__description-input:hover,
-.editor__description-input:focus {
-  border-bottom-color: var(--border-strong);
-}
-
-.editor__description-input:focus-visible {
-  outline: none;
-  border-bottom-color: var(--accent-brass);
-}
-
-.editor__title-input::placeholder,
-.editor__description-input::placeholder {
-  color: var(--text-placeholder);
 }
 
 .editor__controls {

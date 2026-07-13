@@ -6,6 +6,8 @@ import { Score } from '../models/Score.js'
 const WRITABLE_FIELDS = [
   'title',
   'description',
+  'bpm',
+  'composer',
   'timeSignature',
   'keySignature',
   'displayMode',

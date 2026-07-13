@@ -10,6 +10,11 @@ const scoreSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '', trim: true },
 
+    // The engraved credits: tempo in beats per minute and the composer's name.
+    // Both optional — a sheet without them simply doesn't show them.
+    bpm: { type: Number, default: null },
+    composer: { type: String, default: '', trim: true },
+
     // Notation settings. Kept as plain strings (e.g. "4/4", "C") because the
     // editor, not the database, is the authority on what they mean.
     timeSignature: { type: String, default: '4/4' },

@@ -118,7 +118,8 @@ The app should feel like **writing on paper, with quality of life** — not like
 
 ## Data model (source of truth)
 
-Score: `title`, `description`, `timeSignature`, `keySignature`,
+Score: `title`, `description`, `bpm` (tempo in beats per minute, number | null),
+`composer` (string, optional), `timeSignature`, `keySignature`,
 `displayMode` (`notation` | `both`), `owner` (ref User), timestamps,
 `measures[]`. Measure: `notes[]` (note events). Note event:
 

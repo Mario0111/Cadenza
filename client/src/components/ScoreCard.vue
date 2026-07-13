@@ -10,6 +10,7 @@
 import { ref, nextTick, computed } from 'vue'
 import { updateScore, deleteScore } from '@/api/scores'
 import PaperCard from './PaperCard.vue'
+import ScorePreview from './ScorePreview.vue'
 import AppButton from './AppButton.vue'
 import QuietMark from './QuietMark.vue'
 
@@ -114,6 +115,11 @@ const error = ref('')
 
 <template>
   <PaperCard class="score-card">
+    <!-- A little manuscript of the score's opening — the folio reads like a
+         shelf, not a list. Decorative and a second way into the editor; the
+         title link and Open button remain the primary path. -->
+    <ScorePreview :score="score" />
+
     <!-- Title, or the inline rename field while renaming. -->
     <form v-if="renaming" class="score-card__rename" @submit.prevent="saveRename">
       <label class="sr-only" :for="`rename-${score.id}`">New title</label>

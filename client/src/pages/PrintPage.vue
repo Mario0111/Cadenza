@@ -92,6 +92,13 @@ function onPrint() {
       <div ref="sheet" class="print-sheet">
         <h1 class="print-sheet__title">{{ score.title || 'Untitled score' }}</h1>
         <p v-if="score.description" class="print-sheet__description">{{ score.description }}</p>
+        <!-- The credits line, the way an engraver sets it: tempo on the left,
+             composer on the right, just above the first system. Only drawn
+             when there is something to say. -->
+        <div v-if="score.bpm || score.composer" class="print-sheet__credits">
+          <span v-if="score.bpm" class="print-sheet__tempo">{{ score.bpm }} bpm</span>
+          <span v-if="score.composer" class="print-sheet__composer">{{ score.composer }}</span>
+        </div>
         <ScoreCanvas :score="score" :page-width="SHEET_WIDTH" :show-marks="false" />
       </div>
     </template>
@@ -169,6 +176,25 @@ function onPrint() {
   color: var(--text-primary);
   text-align: center;
   margin: var(--space-2) 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* Tempo left, composer right — the corners of the credits line. The composer's
+   margin-left:auto keeps it on the right even when it stands alone. */
+.print-sheet__credits {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-top: var(--space-3);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.print-sheet__composer {
+  margin-left: auto;
   overflow-wrap: anywhere;
 }
 
