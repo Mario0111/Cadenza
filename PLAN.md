@@ -433,3 +433,28 @@ and PDF alike.
       no console errors; Mario's hands-on run (incl. an actual PDF download)
       pending
 - 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 15 — harmonics (Mario's call 2026-07-14)
+A guitarist's harmonic, the same manual way beams and slurs work: a per-note
+flag set by hand, never inferred. On the notation stave it draws the engraved
+natural-harmonic mark — a small circle above the note (VexFlow's own
+`Articulation('ah')`); on the tab stave the fret number wears the conventional
+angle brackets (`<12>`). One flag, both staves, print and PDF included (they
+share the renderer). Server untouched — measures are opaque JSON.
+- [x] Model: `harmonic: false` on the note event (`createNote`, CLAUDE.md);
+      `isHarmonicable(note)` in scoreModel — anything that sounds (pitched or
+      tab-only, not a rest)
+- [x] Store: `toggleHarmonic` action (same shape as `toggleBeam`/`toggleSlur`)
+- [x] NoteToolbar: a Harmonic toggle beside Slur (disabled unless the
+      selection can sound); EditorPage wires it and adds key `h` (hint updated)
+- [x] Renderer: notation notes take the circle Articulation above; tab frets
+      render bracketed when flagged
+- [~] Manual test: exercised in the browser against the live API — toggle
+      draws the circle (path-count delta) and brackets the fret (`<12>`) on a
+      pitched-with-tab note and a tab-only note, a rest refuses the flag and
+      disables the button, key `h` toggles, flags survive save → reload, the
+      print sheet shows the same marks, no console errors; Mario's hands-on
+      run pending
+- 🛑 **Stop, summarize, wait for review + commit.**

@@ -24,6 +24,7 @@ export function createNote(overrides = {}) {
     isRest: false,
     beamed: false, // set BY HAND; adjacent flagged eighths-or-shorter share a beam
     slurred: false, // set BY HAND; adjacent flagged notes share one slur
+    harmonic: false, // set BY HAND; circle above the note, brackets round the fret
     strings: [null], // per-pitch, nullable — tabs are entered by hand
     frets: [null],
     leftFinger: null, // 1..4 | null
@@ -96,6 +97,16 @@ export function isBeamable(note) {
  */
 export function isSlurrable(note) {
   if (!note || note.isRest || isTabOnly(note)) return false
+  return true
+}
+
+/**
+ * True when a note can sound a harmonic: anything that sounds — a pitched note
+ * or a tab-only note, but not a rest (nothing rings there). The `harmonic`
+ * flag itself is manual; this only says whether the flag can mean anything.
+ */
+export function isHarmonicable(note) {
+  if (!note || note.isRest) return false
   return true
 }
 

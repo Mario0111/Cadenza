@@ -32,6 +32,7 @@ import {
   StaveConnector,
   FretHandFinger,
   Annotation,
+  Articulation,
   Modifier
 } from 'vexflow'
 
@@ -133,6 +134,16 @@ function toStaveNote(note) {
       .setVerticalJustification(Annotation.VerticalJustify.BOTTOM)
     staveNote.addModifier(annotation, 0)
   }
+
+  // A harmonic wears the engraved mark: a small circle above the note —
+  // VexFlow's 'ah' articulation, the standard natural-harmonic sign. Manual,
+  // like beams and slurs: only the flag draws it.
+  if (!note.isRest && note.harmonic) {
+    staveNote.addModifier(
+      new Articulation('ah').setPosition(Modifier.Position.ABOVE),
+      0
+    )
+  }
   return staveNote
 }
 
@@ -148,7 +159,12 @@ function toTabNote(note) {
   const positions = []
   ;(note.strings || []).forEach((str, i) => {
     const fret = note.frets?.[i]
-    if (str != null && fret != null) positions.push({ str, fret })
+    if (str != null && fret != null) {
+      // A harmonic's fret wears the conventional angle brackets — "<12>".
+      // TabNote draws whatever text it's given, so the brackets are pure
+      // presentation; the model keeps the plain number.
+      positions.push({ str, fret: note.harmonic ? `<${fret}>` : fret })
+    }
   })
   if (!positions.length) return null
 

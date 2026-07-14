@@ -20,7 +20,7 @@ import ModeSwitcher from '@/components/editor/ModeSwitcher.vue'
 import SheetHeader from '@/components/editor/SheetHeader.vue'
 import { useScoreStore } from '@/stores/score'
 import { DURATIONS } from '@/lib/durations'
-import { measureFullness, isBeamable, isSlurrable } from '@/lib/scoreModel'
+import { measureFullness, isBeamable, isSlurrable, isHarmonicable } from '@/lib/scoreModel'
 import { SHEET_WIDTH } from '@/lib/printSheet'
 
 const store = useScoreStore()
@@ -144,6 +144,7 @@ function onKeydown(event) {
   else if (key === 'Enter' || lower === 'n') store.addNoteAfterSelection()
   else if (key === '.') store.toggleDot()
   else if (lower === 'r') store.toggleRest()
+  else if (lower === 'h') store.toggleHarmonic()
   else if (DURATION_KEYS[key]) store.setDuration(DURATION_KEYS[key])
   else if (PITCH_LETTER_KEYS.includes(lower)) store.setSelectedLetter(lower)
   else handled = false
@@ -231,6 +232,8 @@ function onKeydown(event) {
         :can-beam="isBeamable(store.selectedNote)"
         :slurred="Boolean(store.selectedNote?.slurred)"
         :can-slur="isSlurrable(store.selectedNote)"
+        :harmonic="Boolean(store.selectedNote?.harmonic)"
+        :can-harmonic="isHarmonicable(store.selectedNote)"
         :can-remove-measure="store.canRemoveMeasure"
         :status="status"
         @set-duration="store.setDuration"
@@ -238,6 +241,7 @@ function onKeydown(event) {
         @toggle-rest="store.toggleRest"
         @toggle-beam="store.toggleBeam"
         @toggle-slur="store.toggleSlur"
+        @toggle-harmonic="store.toggleHarmonic"
         @delete-note="store.deleteSelectedNote"
         @add-measure="store.addMeasure"
         @remove-measure="store.removeSelectedMeasure"
@@ -301,7 +305,9 @@ function onKeydown(event) {
         the next note, Delete removes, Escape puts the pen down. Ctrl+S saves.
         Beam joins a selected eighth (or shorter) to its beamed neighbours —
         flag each note you want under the same beam. Slur works the same over
-        any notes: flag each one to arc a single curve across them.
+        any notes: flag each one to arc a single curve across them. Harmonic
+        (key h) marks the selected note with a circle above it and angle
+        brackets round its fret.
       </p>
     </template>
   </section>

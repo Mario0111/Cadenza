@@ -114,6 +114,9 @@ The app should feel like **writing on paper, with quality of life** — not like
   on-line dot into the space above, and the renderer zeroes that shift after formatting.
 - Left-hand fingering (1–4): `FretHandFinger` modifier near the notehead.
   Right-hand fingering (p/i/m/a): `Annotation` positioned below the note.
+- Harmonics are manual too: the note event's `harmonic` flag draws VexFlow's
+  natural-harmonic `Articulation('ah')` (a small circle) above the notation note,
+  and the tab stave renders the flagged note's fret in angle brackets (`<12>`).
 - **No custom canvas rendering.**
 
 ## Data model (source of truth)
@@ -131,6 +134,7 @@ Score: `title`, `description`, `bpm` (tempo in beats per minute, number | null),
   isRest: false,
   beamed: false,                  // manual; adjacent flagged 8ths-or-shorter share one beam
   slurred: false,                 // manual; adjacent flagged notes share one slur curve
+  harmonic: false,                // manual; circle above the note, <brackets> round the fret
   strings: [1, null],             // per-pitch, nullable — tabs are manual
   frets:   [0, null],             // per-pitch, nullable
   leftFinger: null,               // 1..4 | null

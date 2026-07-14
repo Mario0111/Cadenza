@@ -22,6 +22,10 @@ defineProps({
   // note — see isSlurrable in scoreModel).
   slurred: { type: Boolean, default: false },
   canSlur: { type: Boolean, default: false },
+  // The selected note's harmonic flag, and whether it can carry one (anything
+  // that sounds — see isHarmonicable in scoreModel).
+  harmonic: { type: Boolean, default: false },
+  canHarmonic: { type: Boolean, default: false },
   canRemoveMeasure: { type: Boolean, default: false },
   // Quiet status line: "Measure 2, note 3 — editing" / "Writing quarters", …
   status: { type: String, default: '' }
@@ -33,6 +37,7 @@ defineEmits([
   'toggle-rest',
   'toggle-beam',
   'toggle-slur',
+  'toggle-harmonic',
   'delete-note',
   'add-measure',
   'remove-measure'
@@ -133,6 +138,17 @@ function onFigureDragStart(event, code) {
         @click="$emit('toggle-slur')"
       >
         Slur
+      </button>
+      <button
+        type="button"
+        class="note-toolbar__button note-toolbar__button--labelled"
+        :class="{ 'note-toolbar__button--active': harmonic }"
+        title="Harmonic — a circle above the note, brackets round the fret; key h"
+        :aria-pressed="harmonic"
+        :disabled="!canHarmonic"
+        @click="$emit('toggle-harmonic')"
+      >
+        Harmonic
       </button>
     </div>
 

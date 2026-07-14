@@ -14,7 +14,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { createScore, createMeasure, defaultNextNote, isTabOnly, isBeamable, isSlurrable } from '@/lib/scoreModel'
+import { createScore, createMeasure, defaultNextNote, isTabOnly, isBeamable, isSlurrable, isHarmonicable } from '@/lib/scoreModel'
 import { shiftPitch, setPitchLetter } from '@/lib/pitches'
 import * as scoresApi from '@/api/scores'
 
@@ -354,6 +354,19 @@ export const useScoreStore = defineStore('score', () => {
   }
 
   /**
+   * Toggle the harmonic flag on the selected note — by hand, like beams and
+   * slurs. Anything that sounds can ring a harmonic (a rest can't); the
+   * renderer draws the circle above the note and brackets round the fret.
+   * Nothing is ever marked harmonic for you.
+   */
+  function toggleHarmonic() {
+    const note = selectedNote.value
+    if (!isHarmonicable(note)) return
+    note.harmonic = !note.harmonic
+    markDirty()
+  }
+
+  /**
    * Move the selected note by `delta` staff positions (±7 = an octave). For a
    * tab-only note "up" and "down" mean the neighbouring string instead — one
    * string per press, whatever the delta, since strings have no octaves. The
@@ -553,6 +566,7 @@ export const useScoreStore = defineStore('score', () => {
     toggleRest,
     toggleBeam,
     toggleSlur,
+    toggleHarmonic,
     transposeSelected,
     setSelectedLetter,
     deleteSelectedNote,
