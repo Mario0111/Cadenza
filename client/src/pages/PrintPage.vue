@@ -5,7 +5,7 @@
 // everything marked .no-print disappears and only the sheet remains (see
 // assets/styles/print.css). The PDF download copies the same sheet — the
 // rendered SVG plus the header — via usePdfExport.
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { getScore } from '@/api/scores'
 import AppButton from '@/components/AppButton.vue'
@@ -15,6 +15,7 @@ import { usePdfExport } from '@/composables/usePdfExport'
 // The same fixed page width the editor uses, so this sheet shows exactly the
 // systems and line breaks you saw while writing.
 import { SHEET_WIDTH } from '@/lib/printSheet'
+import { beatGlyph } from '@/lib/durations'
 
 const route = useRoute()
 
@@ -36,7 +37,36 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  // The sheet only renders after loading flips; crop it once it exists.
+  await nextTick()
+  tightenSheet()
 })
+
+/*
+ * Trim the sheet's blank top and bottom. The renderer reserves generous
+ * ledger territory around every staff (30px+ of headroom for notes up to
+ * c/7) — working room the editor needs, blank paper on a printed sheet. So
+ * the SVG's viewBox is cropped to the drawing's own ink box (getBBox misses
+ * nothing that was drawn, so no note can clip), keeping the width and the
+ * 1:1 scale; the height attribute follows the viewBox so nothing rescales.
+ * The PDF export reads the cropped height off the same attributes, so the
+ * download tightens with the sheet.
+ */
+function tightenSheet() {
+  const svg = sheet.value ? sheet.value.querySelector('svg') : null
+  if (!svg) return
+  const ink = svg.getBBox()
+  const pad = 6 // a breath of paper above the highest and below the lowest ink
+  const width = Number(svg.getAttribute('width'))
+  const top = Math.max(0, ink.y - pad)
+  const height = ink.y + ink.height + pad - top
+  svg.setAttribute('viewBox', `0 ${top} ${width} ${height}`)
+  // VexFlow writes the size as an INLINE style too, which beats the height
+  // attribute — without this the shorter viewBox letterboxes inside the old
+  // 150px viewport instead of shrinking it.
+  svg.setAttribute('height', height)
+  svg.style.height = `${height}px`
+}
 
 // The sheet element: the PDF export reads the rendered SVG and the resolved
 // ink colour straight off it, so PDF and sheet can't drift apart.
@@ -96,7 +126,14 @@ function onPrint() {
              composer on the right, just above the first system. Only drawn
              when there is something to say. -->
         <div v-if="score.bpm || score.composer" class="print-sheet__credits">
-          <span v-if="score.bpm" class="print-sheet__tempo">{{ score.bpm }} bpm</span>
+          <span v-if="score.bpm" class="print-sheet__tempo">
+            <!-- The metronome mark, the engraved way: the beat figure (a
+                 Bravura glyph, upright), an equals sign, the number. -->
+            <span class="print-sheet__tempo-figure" aria-hidden="true">{{
+              beatGlyph(score.beatUnit, score.beatDotted)
+            }}</span>
+            = {{ score.bpm }}
+          </span>
           <span v-if="score.composer" class="print-sheet__composer">{{ score.composer }}</span>
         </div>
         <ScoreCanvas :score="score" :page-width="SHEET_WIDTH" :show-marks="false" />
@@ -158,7 +195,16 @@ function onPrint() {
 
 /* The engraved header: centered, all in ink, the classical title plate.
    Kept to --text-primary on purpose — the PDF draws its header in the same
-   single ink, so sheet and download stay twins. */
+   single ink, so sheet and download stay twins. The 10px side padding on all
+   header text mirrors the renderer's own page gutter (PAGE_MARGIN), so the
+   composer's name ends exactly on the final barline. */
+.print-sheet__title,
+.print-sheet__description,
+.print-sheet__credits {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 .print-sheet__title {
   font-family: var(--font-display);
   font-size: var(--text-xl);
@@ -196,6 +242,13 @@ function onPrint() {
 .print-sheet__composer {
   margin-left: auto;
   overflow-wrap: anywhere;
+}
+
+/* The beat figure keeps the music face upright — an italic would slant the
+   little note sideways. */
+.print-sheet__tempo-figure {
+  font-family: var(--font-music);
+  font-style: normal;
 }
 
 /* Air between the header and the engraving (the SVG only carries 10px of its

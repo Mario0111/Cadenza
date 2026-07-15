@@ -71,6 +71,55 @@ export function pdfLayout({ svgWidth, svgHeight, hasDescription, hasCredits }) {
 }
 
 /**
+ * The tempo mark's beat figure for the PDF, as pure geometry. jsPDF's built-in
+ * fonts carry no music glyphs, so the little note is drawn from primitives —
+ * a notehead, a stem, flags, a dot — sized to sit beside the credits text
+ * (13px). All coordinates are relative to the figure's origin: x = 0 at its
+ * left edge, y = 0 on the TEXT BASELINE (the notehead rests on it, the stem
+ * rises above it — negative y is up, as on the page).
+ *
+ * Returns { head, stem, flags, dot, width }:
+ *   head  — { x, y, rx, ry, filled }  centre + radii of the notehead ellipse
+ *   stem  — { x, y1, y2 } | null      a vertical line (whole notes have none)
+ *   flags — [{ x, y, curve }]         each a cubic Bézier from the stem top,
+ *                                     curve = [dx1,dy1, dx2,dy2, dx,dy]
+ *   dot   — { x, y, r } | null        the augmentation dot beside the head
+ *   width — total width, so "= 120" knows where to start
+ */
+export function tempoFigure(beatUnit = 'q', beatDotted = false) {
+  // A whole note is just a wider hollow oval; everything else is a head with
+  // a stem. Only the quarter and shorter are filled.
+  const isWhole = beatUnit === 'w'
+  const head = isWhole
+    ? { x: 3.5, y: -2.3, rx: 3.5, ry: 2.3, filled: false }
+    : { x: 2.8, y: -2.1, rx: 2.8, ry: 2.1, filled: beatUnit !== 'h' }
+
+  // The stem rises from the head's right shoulder to a fixed top.
+  const stemX = head.x + head.rx
+  const stem = isWhole ? null : { x: stemX, y1: head.y, y2: -12.5 }
+
+  // Flags hang off the stem top, curving out and down; a sixteenth stacks a
+  // second one a little lower. Eighth = 1 flag, sixteenth = 2, longer = none.
+  const flagCurve = [2.6, 1.6, 3.0, 4.4, 1.2, 6.6]
+  const flagCount = beatUnit === '8' ? 1 : beatUnit === '16' ? 2 : 0
+  const flags = Array.from({ length: flagCount }, (_, i) => ({
+    x: stemX,
+    y: stem.y2 + i * 3.5,
+    curve: flagCurve
+  }))
+
+  const dot = beatDotted
+    ? { x: head.x + head.rx + 2.4, y: head.y, r: 0.95 }
+    : null
+
+  // The figure's right edge: the head (whole), the flags' reach (8th/16th) or
+  // the stem — and the dot past whichever of those it follows.
+  let width = isWhole ? head.x + head.rx : flagCount ? stemX + 4.2 : stemX
+  if (dot) width = Math.max(width, dot.x + dot.r)
+  return { head, stem, flags, dot, width }
+}
+
+/**
  * Parse a computed CSS colour ("rgb(33, 26, 16)") into [r, g, b] for jsPDF's
  * setTextColor. Returns null when the string isn't in that form — the caller
  * just skips the call and lets jsPDF keep its default ink.

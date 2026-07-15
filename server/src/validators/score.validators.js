@@ -18,6 +18,14 @@ const optionalScoreFields = [
     .optional()
     .isString()
     .withMessage('A composer has to be text.'),
+  body('beatUnit')
+    .optional()
+    .isIn(['w', 'h', 'q', '8', '16'])
+    .withMessage('The beat has to be one of the note figures.'),
+  body('beatDotted')
+    .optional()
+    .isBoolean()
+    .withMessage('Dotted has to be yes or no.'),
   body('timeSignature')
     .optional()
     .isString()

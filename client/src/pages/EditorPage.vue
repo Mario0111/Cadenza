@@ -223,43 +223,53 @@ function onKeydown(event) {
         <QuietMark v-if="store.saveError" :message="store.saveError" />
       </header>
 
-      <NoteToolbar
-        :duration="store.activeSettings.duration"
-        :dotted="store.activeSettings.dotted"
-        :is-rest="store.activeSettings.isRest"
-        :has-selection="Boolean(store.selectedNote)"
-        :beamed="Boolean(store.selectedNote?.beamed)"
-        :can-beam="isBeamable(store.selectedNote)"
-        :slurred="Boolean(store.selectedNote?.slurred)"
-        :can-slur="isSlurrable(store.selectedNote)"
-        :harmonic="Boolean(store.selectedNote?.harmonic)"
-        :can-harmonic="isHarmonicable(store.selectedNote)"
-        :can-remove-measure="store.canRemoveMeasure"
-        :status="status"
-        @set-duration="store.setDuration"
-        @toggle-dot="store.toggleDot"
-        @toggle-rest="store.toggleRest"
-        @toggle-beam="store.toggleBeam"
-        @toggle-slur="store.toggleSlur"
-        @toggle-harmonic="store.toggleHarmonic"
-        @delete-note="store.deleteSelectedNote"
-        @add-measure="store.addMeasure"
-        @remove-measure="store.removeSelectedMeasure"
-      />
-
       <div class="editor__body">
+        <NoteToolbar
+          class="editor__rail"
+          :duration="store.activeSettings.duration"
+          :dotted="store.activeSettings.dotted"
+          :is-rest="store.activeSettings.isRest"
+          :has-selection="Boolean(store.selectedNote)"
+          :beamed="Boolean(store.selectedNote?.beamed)"
+          :can-beam="isBeamable(store.selectedNote)"
+          :slurred="Boolean(store.selectedNote?.slurred)"
+          :can-slur="isSlurrable(store.selectedNote)"
+          :harmonic="Boolean(store.selectedNote?.harmonic)"
+          :can-harmonic="isHarmonicable(store.selectedNote)"
+          :can-remove-measure="store.canRemoveMeasure"
+          :status="status"
+          @set-duration="store.setDuration"
+          @toggle-dot="store.toggleDot"
+          @toggle-rest="store.toggleRest"
+          @toggle-beam="store.toggleBeam"
+          @toggle-slur="store.toggleSlur"
+          @toggle-harmonic="store.toggleHarmonic"
+          @delete-note="store.deleteSelectedNote"
+          @add-measure="store.addMeasure"
+          @remove-measure="store.removeSelectedMeasure"
+        />
+
         <PaperCard class="editor__plate">
           <!-- The engraved header lives on the plate, above the music, and
                OUTSIDE .editor__page — so typing a title never trips the
-               manuscript's keyboard shortcuts. -->
+               manuscript's keyboard shortcuts. Capped at the manuscript's own
+               page width so the title centres over the music and the
+               composer's name ends at the music's right edge, like print. -->
+          <!-- The 10px side padding mirrors the renderer's own page gutter
+               (PAGE_MARGIN), so the composer's name ends exactly on the
+               final barline. -->
           <SheetHeader
+            :style="{ maxWidth: `${SHEET_WIDTH}px`, padding: '0 10px' }"
             :title="store.score.title"
             :description="store.score.description"
             :bpm="store.score.bpm"
+            :beat-unit="store.score.beatUnit"
+            :beat-dotted="store.score.beatDotted"
             :composer="store.score.composer"
             @update:title="store.setTitle"
             @update:description="store.setDescription"
             @update:bpm="store.setBpm"
+            @update:beat="({ unit, dotted }) => store.setBeatUnit(unit, dotted)"
             @update:composer="store.setComposer"
           />
           <div
@@ -295,20 +305,6 @@ function onKeydown(event) {
       </div>
 
       <QuietMark v-if="fullnessSummary" :message="fullnessSummary" />
-
-      <p class="editor__hint">
-        Drag a figure from the toolbar onto a line or space to write a note —
-        or onto a tab string line to write a tab-only note (it lives on the tab
-        stave alone; set its fret in the panel). Click a note to pick it up
-        again. With the manuscript focused: arrows move and transpose, a–g
-        re-letter, 1–6 set the duration, period dots it, r writes rests, n adds
-        the next note, Delete removes, Escape puts the pen down. Ctrl+S saves.
-        Beam joins a selected eighth (or shorter) to its beamed neighbours —
-        flag each note you want under the same beam. Slur works the same over
-        any notes: flag each one to arc a single curve across them. Harmonic
-        (key h) marks the selected note with a circle above it and angle
-        brackets round its fret.
-      </p>
     </template>
   </section>
 </template>
@@ -387,19 +383,41 @@ function onKeydown(event) {
   margin-top: var(--space-4);
 }
 
-/* Manuscript proud on the left, fingering panel in the margin on the right;
-   the panel drops below on narrow screens. */
+/* The desk, narrow first: the tools as a strip on top, then the plate, then
+   the fingering panel — everything full width, stacked. */
 .editor__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
   margin-top: var(--space-4);
 }
 
-@media (max-width: 860px) {
+/* On a wide desk: tool rail · plate · fingering panel. The plate hugs its
+   sheet (fit-content) instead of stretching past the music into blank paper —
+   leftover room goes to the page, not the plate. 1240px is the window width
+   where the desk's columns genuinely fit (the widened app-main cap plus the
+   browser's own scrollbar); below it the sheet would grow a sideways
+   scrollbar, so the layout stays stacked instead. The breakpoint matches
+   NoteToolbar's rail flip — the two must change together. */
+@media (min-width: 1240px) {
   .editor__body {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, max-content) 240px;
+  }
+
+  .editor__plate {
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  /* The rail and the panel ride along as you scroll, parked just below the
+     TopChrome (57px tall), so the tools are at hand anywhere in the piece.
+     Sticky works here because align-items: start keeps both shorter than
+     the plate's grid row. */
+  .editor__rail,
+  .editor__fingering {
+    position: sticky;
+    top: calc(57px + var(--space-4));
   }
 }
 
@@ -413,11 +431,4 @@ function onKeydown(event) {
   box-shadow: var(--shadow-focus);
 }
 
-.editor__hint {
-  margin-top: var(--space-4);
-  max-width: 72ch;
-  font-family: var(--font-serif);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
 </style>

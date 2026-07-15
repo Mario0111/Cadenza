@@ -458,3 +458,148 @@ share the renderer). Server untouched — measures are opaque JSON.
       print sheet shows the same marks, no console errors; Mario's hands-on
       run pending
 - 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 16 — the beat figure in the tempo mark (Mario's call 2026-07-14)
+Phase 14 wrote the tempo as "120 bpm"; the engraved convention is a metronome
+mark — a note figure, an equals sign, the number ("♩ = 120") — and the figure
+is the composer's choice (a dotted quarter in 6/8, a half in cut time). So the
+score gains `beatUnit` + `beatDotted`, the editor's tempo corner becomes
+[figure select] = [number], and sheet, print and PDF all read the same mark.
+On screen the figure is Bravura's SMuFL metronome glyph; in the PDF (whose
+built-in fonts carry no music glyphs) the figure is drawn from pure geometry —
+a notehead, a stem, flags, a dot — in ~a dozen commented lines.
+- [x] Data model: `beatUnit` ('w'|'h'|'q'|'8'|'16', default 'q') and
+      `beatDotted` (boolean, default false) — server model + enum validator,
+      WRITABLE_FIELDS, `createScore` defaults, CLAUDE.md
+- [x] `durations.js`: `BEAT_UNITS` (code, label, Bravura metronome glyph),
+      the augmentation-dot glyph and `beatGlyph()` — shared by the editor
+      and the print sheet
+- [x] Store: load/save both fields (older scores open as a plain quarter);
+      `setBeatUnit(unit, dotted)` action with the usual quiet guard
+- [x] SheetHeader: the tempo corner becomes [beat-figure select] = [bpm] —
+      the select's options show the glyph and its plain name (dotted variants
+      only for half/quarter/eighth, the beats that actually get dotted)
+- [x] PrintPage: the credits line renders the glyph = number, glyph upright
+- [x] PDF: `tempoFigure(unit, dotted)` in printSheet.js — pure geometry
+      (head/stem/flags/dot primitives + total width, 11 headless assertions
+      pass); usePdfExport draws it in the header ink and writes "= 120" after
+- [~] Manual test: exercised in the browser against the live API — create
+      with a dotted-quarter beat, 400 on a bad unit, Bravura confirmed shaping
+      the metronome glyphs (measured against fallback), select shows all 8
+      figures and round-trips through change → save → API, print sheet renders
+      quarter-glyph + dot upright beside "= 72", no console errors; Mario's
+      hands-on run (incl. an actual PDF download) pending
+- 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 17 — the library preview as a true miniature sheet (Mario's call 2026-07-14)
+Two problems with the folio previews. (1) The music draws in oxblood, not ink:
+the preview became a RouterLink, links wear `--accent-oxblood` (base.css), and
+the renderer takes its ink from the container's inherited `color` — so the
+whole engraving went red. (2) The preview shows only title + music, but a
+miniature of the printed sheet should show everything the print shows: the
+description, the metronome mark (figure = number) and the composer.
+- [x] Pin `color: var(--text-primary)` on the preview's canvas so the
+      engraving is ink again (the renderer reads it off the container)
+- [x] Mirror the print-sheet header at miniature scale: centred title (as
+      now), centred italic description, and the credits line — tempo glyph
+      = number left, composer right — each only when set, same conditions
+      as PrintPage (description and composer trim to one line so a long text
+      never squeezes the music out of the card)
+- [~] Manual test: exercised in the browser against the live API — the full
+      card shows description, "♩. = 72" (glyph + dot in Bravura, upright) and
+      the composer; the drawn engraving's computed colours are --text-primary
+      (plus VexFlow's own #999 stave-line default, present everywhere) with no
+      oxblood left; the empty card keeps its calm placeholder under the header;
+      no console errors; Mario's hands-on run pending
+- [x] Review round 1 (Mario): the music sits tight under the credits line and
+      stretches to the composer's right edge. The viewBox now crops to the
+      MUSIC'S OWN BOX read from the renderer's layout report — from the
+      measures' left edge to the rightmost barline, a couple of ledger lines
+      above the first top staff line to a little below the last visible
+      bottom line — instead of the full 680px sheet with its empty headroom.
+      A 120px crop floor guards the lone-empty-measure case from comic zoom.
+      Verified in the browser: credits → music gap 4px, drawn ink's right
+      edge flush with the composer's (0–2px), short and long scores alike,
+      no console errors.
+- [x] Review round 2 (Mario): the tight header belongs to EVERY sheet, and
+      the preview's zoom should be uniform.
+      (a) Preview: one fixed zoom for every card — the viewBox width is
+      always the full engraving line (no content-adaptive scaling); short
+      pieces simply show less ink.
+      (b) Print + PDF: the sheet's SVG is cropped to its ink (getBBox, small
+      pad) top and bottom at 1:1, so the music tucks up under the credits —
+      nothing can clip because the box is measured from the drawing itself;
+      the PDF reads the cropped height and tightens with it.
+      (c) Editor: the sheet header is capped at the manuscript's SHEET_WIDTH,
+      so the title centres over the music and the composer's name ends at the
+      music's right edge, exactly like print. The air above the editor's first
+      staff line STAYS — it is the writable band (high-note drops, quiet
+      marks), not blank paper.
+      Verified in the browser: both preview cards at the identical 0.434
+      scale (fixed 660 viewBox width); print credits → first ink 18px
+      (frame margin + 6px pad) at 1:1 with the bottom trimmed too (one fix
+      en route: VexFlow's inline style height was letterboxing the cropped
+      viewBox — the crop now sets style.height as well); editor header
+      680px wide, composer input flush with the manuscript's right edge;
+      no console errors.
+- [x] Review round 3 (Mario): the music LINES must reach the right edge —
+      every row ends where the composer's name does. Rows are now justified
+      in the renderer (editor, print, PDF and preview all inherit it):
+      measures keep their per-figure natural width for deciding line wraps,
+      then the whole row stretches proportionally — measure widths and
+      figure offsets alike, the same scale pass that already squeezed
+      over-cap measures, now allowed past 1. The LAST line stretches like
+      any other (a short piece is all last line — leaving it ragged was the
+      complaint). Supersedes Phase 10 round 2's ragged right, which itself
+      superseded Phase 7 round 2's justification — the difference this time:
+      figures stretch WITH their measures, so no blank space appears between
+      a measure's figures and its barline. The header text (editor, print,
+      PDF credits) is inset by the renderer's 10px page gutter so the
+      composer's name ends exactly on the final barline. CLAUDE.md's spacing
+      rule updated. Verified in the browser: composer vs final barline within
+      1px in the editor, every print row (last included) flush at 752 vs
+      composer 751, both preview cards at the identical 0.434 scale with ink
+      flush to the composer (0px), stretched figures spread proportionally
+      (two quarters at x 87/495 across a lone measure), no console errors.
+- 🛑 **Stop, summarize, wait for review + commit.**
+
+---
+
+## Phase 18 — the desk rearranged: tool rail left, sticky tools (Mario's call 2026-07-14)
+The writing tools sat in a strip above the manuscript, and the plate stretched
+to fill the page — blank paper right of the music (ugly, per Mario). New desk:
+the plate hugs its sheet, the toolbar becomes a TOOL RAIL down the left side
+(the DS's ToolRail concept), and both the rail and the fingering panel are
+sticky — they ride along as you scroll, so the tools are at hand anywhere in
+the piece.
+- [x] `NoteToolbar.vue` restyled as a vertical rail: figures three to a row,
+      the option toggles (dot/rest/beam/slur/harmonic), delete and the
+      measure controls stacked below, the status line at the rail's foot;
+      below 1200px it falls back to the old horizontal strip (the breakpoint
+      must match EditorPage's — noted in both files)
+- [x] `EditorPage.vue`: three-column desk — rail · plate · fingering panel;
+      the plate takes `width: fit-content` so the paper ends where the sheet
+      does; rail and panel `position: sticky` at 69px (TopChrome's 57px + a
+      breath), riding along as the piece scrolls
+- [~] Manual test: verified in the browser at 1366px — column order
+      rail(158) · plate(730, hugging the sheet) · panel(240); after a 900px
+      scroll the rail and panel stay pinned at 69px while the plate scrolls
+      past; at 1000px the page renders with the old strip layout (base CSS);
+      production build passes. The two HMR errors in the console came from
+      an intermediate edit state, not the final code — every layout probe ran
+      after the final reload. Mario's hands-on run pending.
+- [x] Review round 1 (Mario): the sheet grew a sideways scrollbar — the
+      desk's columns (1152px) plus the shell's padding (48px) need exactly
+      the 1200px content cap, so the browser's own scrollbar squeezed the
+      plate. No slider: the editor route now carries `wideDesk` meta and
+      App.vue widens its cap by 40px for it (other pages keep 1200); the
+      rail/desk breakpoints rose 1200 → 1240 to match, so the three-column
+      layout only engages where it genuinely fits. Verified at 1366px: no
+      sideways scroll (frame scrollWidth = clientWidth = 680), plate at its
+      true 746px, main at 1240 on the editor and 1200 on the library, no
+      console errors.
+- 🛑 **Stop, summarize, wait for review + commit.**

@@ -15,6 +15,16 @@ const scoreSchema = new mongoose.Schema(
     bpm: { type: Number, default: null },
     composer: { type: String, default: '', trim: true },
 
+    // Which figure the tempo counts ("♩ = 120" vs "♩. = 120"): a duration code
+    // plus its dot. Only meaningful alongside bpm, but stored on its own so
+    // the choice survives clearing and re-entering the number.
+    beatUnit: {
+      type: String,
+      enum: ['w', 'h', 'q', '8', '16'],
+      default: 'q'
+    },
+    beatDotted: { type: Boolean, default: false },
+
     // Notation settings. Kept as plain strings (e.g. "4/4", "C") because the
     // editor, not the database, is the authority on what they mean.
     timeSignature: { type: String, default: '4/4' },

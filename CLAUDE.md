@@ -106,7 +106,10 @@ The app should feel like **writing on paper, with quality of life** — not like
 - VexFlow's formatter aligns the staves' voices and lays out modifiers; the horizontal
   spacing itself follows the fixed per-figure rule in `lib/noteSpacing.js` (longer
   figure, a bit more room — deterministic, never proportional to time), and each
-  measure's width comes from that same rule so measures hug their figures.
+  measure's natural width comes from that same rule (it decides where lines wrap).
+  Every row is then justified to the page's right edge — the whole line stretches
+  proportionally, figures and all, so the music ends where the engraved header's
+  right edge does (Mario's call 2026-07-14; the last line stretches like any other).
 - Beams and slurs are manual: the note event's `beamed` / `slurred` flags, set by hand;
   the renderer joins adjacent flagged notes with `Beam` (eighths-or-shorter) or one
   `Curve` slur (any notes). Nothing is ever beamed or slurred automatically.
@@ -122,7 +125,9 @@ The app should feel like **writing on paper, with quality of life** — not like
 ## Data model (source of truth)
 
 Score: `title`, `description`, `bpm` (tempo in beats per minute, number | null),
-`composer` (string, optional), `timeSignature`, `keySignature`,
+`beatUnit` + `beatDotted` (which figure the tempo counts, e.g. "♩. = 120";
+`'w'|'h'|'q'|'8'|'16'`, default plain quarter), `composer` (string, optional),
+`timeSignature`, `keySignature`,
 `displayMode` (`notation` | `both`), `owner` (ref User), timestamps,
 `measures[]`. Measure: `notes[]` (note events). Note event:
 

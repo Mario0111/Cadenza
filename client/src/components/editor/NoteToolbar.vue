@@ -75,7 +75,7 @@ function onFigureDragStart(event, code) {
 <template>
   <div class="note-toolbar" role="toolbar" aria-label="Writing tools">
     <!-- Durations: a segmented control; the active value wears a brass wash. -->
-    <div class="note-toolbar__group" role="group" aria-label="Duration">
+    <div class="note-toolbar__group note-toolbar__group--figures" role="group" aria-label="Duration">
       <button
         v-for="(option, index) in DURATIONS"
         :key="option.code"
@@ -182,8 +182,6 @@ function onFigureDragStart(event, code) {
       Delete note
     </button>
 
-    <p class="note-toolbar__status">{{ status }}</p>
-
     <div class="note-toolbar__group" role="group" aria-label="Measures">
       <button
         type="button"
@@ -212,6 +210,10 @@ function onFigureDragStart(event, code) {
         Remove measure
       </button>
     </div>
+
+    <!-- The quiet status line sits at the rail's foot (and takes the leftover
+         middle room when the rail falls back to a horizontal strip). -->
+    <p class="note-toolbar__status">{{ status }}</p>
   </div>
 </template>
 
@@ -307,5 +309,45 @@ function onFigureDragStart(event, code) {
   font-style: italic;
   font-size: var(--text-sm);
   color: var(--text-muted);
+}
+
+/*
+ * On a wide desk the toolbar stands as a TOOL RAIL down the manuscript's left
+ * (the DS's ToolRail). The horizontal strip above stays the narrow-window
+ * fallback. The 1240px breakpoint matches the editor's three-column layout
+ * (see EditorPage's .editor__body) — the two must flip together.
+ */
+@media (min-width: 1240px) {
+  .note-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    width: 158px;
+  }
+
+  /* The figures pack three to a row; every other group stacks. */
+  .note-toolbar__group--figures {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .note-toolbar__group:not(.note-toolbar__group--figures) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Labelled buttons read as a list: text starts at one left edge. */
+  .note-toolbar__button--labelled {
+    justify-content: flex-start;
+  }
+
+  /* The group separators turn horizontal with the rail. */
+  .note-toolbar__rule {
+    width: auto;
+    height: 1px;
+  }
+
+  .note-toolbar__status {
+    flex: none;
+    text-align: left;
+  }
 }
 </style>

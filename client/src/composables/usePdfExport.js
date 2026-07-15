@@ -15,7 +15,7 @@ import { ref } from 'vue'
 import { jsPDF } from 'jspdf'
 // Side-effect import: registers the async `doc.svg(element, options)` method.
 import 'svg2pdf.js'
-import { pdfFilename, pdfLayout, cssColorToRgb } from '@/lib/printSheet'
+import { pdfFilename, pdfLayout, tempoFigure, cssColorToRgb } from '@/lib/printSheet'
 
 /*
  * VexFlow sizes its SVG text in pt units (10pt on the root element, 9/12pt on
@@ -69,14 +69,14 @@ export function usePdfExport() {
 
       const title = score.title || 'Untitled score'
       const description = (score.description || '').trim()
-      // The credits line: tempo left, composer right — same text as the sheet.
-      const tempo = score.bpm ? `${score.bpm} bpm` : ''
+      // The credits line: tempo left, composer right — same mark as the sheet.
+      const hasTempo = Boolean(score.bpm)
       const composer = (score.composer || '').trim()
       const layout = pdfLayout({
         svgWidth,
         svgHeight,
         hasDescription: Boolean(description),
-        hasCredits: Boolean(tempo || composer)
+        hasCredits: hasTempo || Boolean(composer)
       })
 
       const doc = new jsPDF({
@@ -104,14 +104,37 @@ export function usePdfExport() {
         doc.text(description, layout.pageWidth / 2, layout.descriptionBaseline, { align: 'center' })
       }
 
-      if (tempo || composer) {
+      if (hasTempo || composer) {
+        // The credits sit inset by the renderer's own page gutter (the 10px
+        // PAGE_MARGIN inside the score SVG), so the composer's name ends
+        // exactly on the final barline — same alignment as the sheet.
+        const gutter = 10
         doc.setFont('times', 'italic')
         doc.setFontSize(layout.creditsSize)
-        if (tempo) {
-          doc.text(tempo, layout.margin, layout.creditsBaseline)
+        if (hasTempo) {
+          // The metronome mark: the beat figure drawn from pure geometry
+          // (jsPDF's fonts have no music glyphs — see tempoFigure), then
+          // "= 120" as text. Shapes take the same ink as the header text.
+          const figure = tempoFigure(score.beatUnit, score.beatDotted)
+          if (ink) {
+            doc.setDrawColor(ink[0], ink[1], ink[2])
+            doc.setFillColor(ink[0], ink[1], ink[2])
+          }
+          doc.setLineWidth(0.8)
+          const fx = layout.margin + gutter
+          const fy = layout.creditsBaseline
+          const { head, stem, flags, dot } = figure
+          doc.ellipse(fx + head.x, fy + head.y, head.rx, head.ry, head.filled ? 'F' : 'S')
+          if (stem) doc.line(fx + stem.x, fy + stem.y1, fx + stem.x, fy + stem.y2)
+          for (const flag of flags) {
+            // doc.lines draws relative cubic Béziers from the given start point.
+            doc.lines([flag.curve], fx + flag.x, fy + flag.y)
+          }
+          if (dot) doc.circle(fx + dot.x, fy + dot.y, dot.r, 'F')
+          doc.text(`= ${score.bpm}`, fx + figure.width + 3, fy)
         }
         if (composer) {
-          doc.text(composer, layout.pageWidth - layout.margin, layout.creditsBaseline, {
+          doc.text(composer, layout.pageWidth - layout.margin - gutter, layout.creditsBaseline, {
             align: 'right'
           })
         }

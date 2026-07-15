@@ -101,8 +101,11 @@ export const useScoreStore = defineStore('score', () => {
       score.value = createScore({
         title: loaded.title,
         description: loaded.description,
-        // Older documents predate these fields — they open quietly unset.
+        // Older documents predate these fields — they open quietly unset
+        // (a missing beat figure reads as the plain quarter it always meant).
         bpm: loaded.bpm ?? null,
+        beatUnit: loaded.beatUnit || 'q',
+        beatDotted: Boolean(loaded.beatDotted),
         composer: loaded.composer || '',
         timeSignature: loaded.timeSignature,
         keySignature: loaded.keySignature,
@@ -142,6 +145,8 @@ export const useScoreStore = defineStore('score', () => {
       title: score.value.title,
       description: score.value.description,
       bpm: score.value.bpm,
+      beatUnit: score.value.beatUnit,
+      beatDotted: score.value.beatDotted,
       composer: score.value.composer,
       timeSignature: score.value.timeSignature,
       keySignature: score.value.keySignature,
@@ -192,6 +197,17 @@ export const useScoreStore = defineStore('score', () => {
 
   function setComposer(composer) {
     score.value.composer = composer
+    markDirty()
+  }
+
+  /**
+   * Set which figure the tempo counts ("♩ = 120" vs "♩. = 120"). The usual
+   * quiet guard: an unknown figure is ignored, never corrected.
+   */
+  function setBeatUnit(unit, dotted) {
+    if (!['w', 'h', 'q', '8', '16'].includes(unit)) return
+    score.value.beatUnit = unit
+    score.value.beatDotted = Boolean(dotted)
     markDirty()
   }
 
@@ -554,6 +570,7 @@ export const useScoreStore = defineStore('score', () => {
     setDescription,
     setBpm,
     setComposer,
+    setBeatUnit,
     setTimeSignature,
     setDisplayMode,
     selectNote,

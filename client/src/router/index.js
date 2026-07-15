@@ -14,6 +14,8 @@ import PrintPage from '@/pages/PrintPage.vue'
 //   requiresAuth  — must be signed in (else → login, remembering where you were)
 //   requiresAdmin — must also be an admin (else → your library)
 //   guestOnly     — only for signed-out visitors (else → your library)
+//   wideDesk      — the page gets a wider content cap (the editor's three
+//                   columns don't fit the standard width; see App.vue)
 const routes = [
   { path: '/', name: 'landing', component: LandingPage },
   { path: '/login', name: 'login', component: LoginPage, meta: { guestOnly: true } },
@@ -21,7 +23,7 @@ const routes = [
 
   { path: '/library', name: 'library', component: LibraryPage, meta: { requiresAuth: true } },
   // :id? — the editor works both for a new score and an existing one.
-  { path: '/editor/:id?', name: 'editor', component: EditorPage, meta: { requiresAuth: true } },
+  { path: '/editor/:id?', name: 'editor', component: EditorPage, meta: { requiresAuth: true, wideDesk: true } },
   { path: '/profile', name: 'profile', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/admin', name: 'admin', component: AdminPage, meta: { requiresAuth: true, requiresAdmin: true } },
   { path: '/print/:id', name: 'print', component: PrintPage, meta: { requiresAuth: true } },

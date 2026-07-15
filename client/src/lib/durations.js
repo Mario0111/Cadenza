@@ -28,6 +28,27 @@ export const DURATIONS = [
 // Fast lookup from a duration code to its base (undotted) tick count.
 const TICKS_BY_CODE = Object.fromEntries(DURATIONS.map((d) => [d.code, d.ticks]))
 
+/*
+ * The figures a tempo mark can count ("♩ = 120"). The glyphs are Bravura's
+ * SMuFL "metronome mark" range (U+ECA0–ECB7) — small figures designed to sit
+ * on the text baseline inline with words, unlike the full-size note glyphs the
+ * toolbar uses. A dotted beat appends the range's own augmentation dot.
+ */
+export const BEAT_UNITS = [
+  { code: 'w', label: 'whole', glyph: '' },
+  { code: 'h', label: 'half', glyph: '' },
+  { code: 'q', label: 'quarter', glyph: '' },
+  { code: '8', label: 'eighth', glyph: '' },
+  { code: '16', label: 'sixteenth', glyph: '' }
+]
+export const BEAT_DOT_GLYPH = ''
+
+/** The Bravura text for a beat figure — glyph plus its dot when dotted. */
+export function beatGlyph(beatUnit, beatDotted = false) {
+  const unit = BEAT_UNITS.find((u) => u.code === beatUnit) || BEAT_UNITS[2] // quarter
+  return beatDotted ? unit.glyph + BEAT_DOT_GLYPH : unit.glyph
+}
+
 // The drag-and-drop payload type for a figure dragged from the toolbar onto
 // the manuscript. A custom type means a stray drag (text, a file) never looks
 // like note input; the payload itself is the duration code above.

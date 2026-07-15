@@ -276,10 +276,12 @@ function planMeasures(score, { showNotation, showTab, selection, selectionInk })
  * each its x, width, and whether it starts a line. Standard engraving: every
  * line restates the clef; only the very first measure shows the time signature.
  *
- * Rows keep their natural width — measures hug their figures, and a line ends
- * where its music ends (Mario's call, replacing the earlier justified right
- * edge: stretching rows to the margin put blank space back between the
- * figures, which is exactly what measure-hugging is for).
+ * Every row is then JUSTIFIED to the page's right edge (Mario's call
+ * 2026-07-14, superseding the earlier ragged right): measures are still sized
+ * by the per-figure rule first — that natural width decides where lines wrap —
+ * and afterwards the whole row stretches proportionally, figures and all (see
+ * the scale pass in drawMeasure), so every line ends where the engraved
+ * header's right edge does. The last line stretches like any other.
  */
 function layoutRows(plans, pageWidth) {
   const usable = pageWidth - PAGE_MARGIN
@@ -310,6 +312,21 @@ function layoutRows(plans, pageWidth) {
   })
 
   if (row.length) rows.push(row)
+
+  // The justification pass: scale each row's measures so the row spans the
+  // full line, from the page margin to the usable right edge.
+  for (const packed of rows) {
+    const last = packed[packed.length - 1]
+    const naturalWidth = last.x + last.width - PAGE_MARGIN
+    const factor = (usable - PAGE_MARGIN) / naturalWidth
+    let cursor = PAGE_MARGIN
+    for (const plan of packed) {
+      plan.x = cursor
+      plan.width = plan.width * factor
+      cursor += plan.width
+    }
+  }
+
   return rows
 }
 
@@ -466,9 +483,10 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
    * lib/noteSpacing.js). So each event's tick context is moved to its planned
    * offset from the first event, which stays where the formatter put it, just
    * after the barline (or clef). A context is shared by an event's notehead
-   * and tab digit, so both staves move together and stay in column. If the
-   * measure hit the width cap, the offsets squeeze proportionally — figures
-   * keep their relative spacing.
+   * and tab digit, so both staves move together and stay in column. The
+   * offsets then scale to the measure's drawn width — up when the row was
+   * justified to the page edge, down if the measure hit the width cap —
+   * so figures always keep their relative spacing.
    */
   const tickables = voices[0].voice.getTickables()
   if (tickables.length) {
@@ -478,7 +496,7 @@ function drawMeasure(context, plan, y, score, { showNotation, showTab }) {
       (plan.showTimeSignature ? TIME_ALLOWANCE : 0)
     const budget = plan.width - leading - TRAILING_SPACE
     const scale =
-      plan.spacing.contentWidth > budget ? budget / plan.spacing.contentWidth : 1
+      plan.spacing.contentWidth > 0 ? budget / plan.spacing.contentWidth : 1
     const baseX = tickables[0].getTickContext().getX()
     tickables.forEach((tickable, i) => {
       tickable.getTickContext().setX(baseX + plan.spacing.offsets[i] * scale)

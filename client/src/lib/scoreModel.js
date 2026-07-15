@@ -44,6 +44,8 @@ export function createScore(overrides = {}) {
     title: 'Untitled score',
     description: '',
     bpm: null, // beats per minute — the engraved tempo, optional
+    beatUnit: 'q', // which figure the tempo counts ("♩ = 120" vs "♪ = 120")
+    beatDotted: false, // a dotted beat figure ("♩. = 120", the 6/8 convention)
     composer: '', // the engraved credit on the sheet's right, optional
     timeSignature: '4/4',
     keySignature: 'C',

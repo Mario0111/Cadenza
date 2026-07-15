@@ -8,6 +8,8 @@ const WRITABLE_FIELDS = [
   'description',
   'bpm',
   'composer',
+  'beatUnit',
+  'beatDotted',
   'timeSignature',
   'keySignature',
   'displayMode',
